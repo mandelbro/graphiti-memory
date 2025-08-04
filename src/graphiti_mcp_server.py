@@ -10,7 +10,7 @@ import os
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Any, TypedDict, cast
+from typing import Any, TypedDict, cast, Optional, List
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 from dotenv import load_dotenv
@@ -140,7 +140,7 @@ class NodeResult(TypedDict):
     uuid: str
     name: str
     summary: str
-    labels: list[str]
+    labels: List[str]
     group_id: str
     created_at: str
     attributes: dict[str, Any]
@@ -148,17 +148,17 @@ class NodeResult(TypedDict):
 
 class NodeSearchResponse(TypedDict):
     message: str
-    nodes: list[NodeResult]
+    nodes: List[NodeResult]
 
 
 class FactSearchResponse(TypedDict):
     message: str
-    facts: list[dict[str, Any]]
+    facts: List[dict[str, Any]]
 
 
 class EpisodeSearchResponse(TypedDict):
     message: str
-    episodes: list[dict[str, Any]]
+    episodes: List[dict[str, Any]]
 
 
 class StatusResponse(TypedDict):
@@ -837,10 +837,10 @@ async def process_episode_queue(group_id: str):
 async def add_memory(
     name: str,
     episode_body: str,
-    group_id: str | None = None,
+    group_id: Optional[str] = None,
     source: str = 'text',
     source_description: str = '',
-    uuid: str | None = None,
+    uuid: Optional[str] = None,
 ) -> SuccessResponse | ErrorResponse:
     """Add an episode to memory. This is the primary way to add information to the graph.
 
@@ -974,9 +974,9 @@ async def add_memory(
 @mcp.tool()
 async def search_memory_nodes(
     query: str,
-    group_ids: list[str] | None = None,
+    group_ids: Optional[List[str]] = None,
     max_nodes: int = 10,
-    center_node_uuid: str | None = None,
+    center_node_uuid: Optional[str] = None,
     entity: str = '',  # cursor seems to break with None
 ) -> NodeSearchResponse | ErrorResponse:
     """Search the graph memory for relevant node summaries.
@@ -1032,7 +1032,7 @@ async def search_memory_nodes(
             return NodeSearchResponse(message='No relevant nodes found', nodes=[])
 
         # Format the node results
-        formatted_nodes: list[NodeResult] = [
+        formatted_nodes: List[NodeResult] = [
             {
                 'uuid': node.uuid,
                 'name': node.name,
@@ -1055,9 +1055,9 @@ async def search_memory_nodes(
 @mcp.tool()
 async def search_memory_facts(
     query: str,
-    group_ids: list[str] | None = None,
+    group_ids: Optional[List[str]] = None,
     max_facts: int = 10,
-    center_node_uuid: str | None = None,
+    center_node_uuid: Optional[str] = None,
 ) -> FactSearchResponse | ErrorResponse:
     """Search the graph memory for relevant facts.
 
@@ -1199,8 +1199,8 @@ async def get_entity_edge(uuid: str) -> dict[str, Any] | ErrorResponse:
 
 @mcp.tool()
 async def get_episodes(
-    group_id: str | None = None, last_n: int = 10
-) -> list[dict[str, Any]] | EpisodeSearchResponse | ErrorResponse:
+    group_id: Optional[str] = None, last_n: int = 10
+) -> List[dict[str, Any]] | EpisodeSearchResponse | ErrorResponse:
     """Get the most recent memory episodes for a specific group.
 
     Args:
