@@ -1,0 +1,23 @@
+# Neo4j Database Configuration
+# This file contains database configuration for Neo4j
+# Sensitive credentials should be set via environment variables:
+# - NEO4J_URI
+# - NEO4J_USER
+# - NEO4J_PASSWORD
+
+# Database connection settings
+uri: "bolt://localhost:7687"
+user: "neo4j"
+# password should be set via NEO4J_PASSWORD environment variable
+
+# Connection pool settings
+connection_pool_size: 50
+connection_timeout: 30
+max_retry_time: 30
+
+# Query settings
+query_timeout: 60
+fetch_size: 1000
+
+# Database settings
+database: "neo4j"  # Default database name

@@ -1,0 +1,22 @@
+# Server Configuration
+# This file contains general server configuration
+
+# MCP server settings
+mcp:
+  transport: "sse"
+  host: "localhost"
+  port: 8020
+
+# Graphiti settings
+graphiti:
+  # Default group ID (can be overridden by CLI argument)
+  group_id: "default"
+
+  # Feature flags
+  use_custom_entities: false
+  destroy_graph: false
+
+# Logging configuration
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

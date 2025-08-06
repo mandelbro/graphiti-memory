@@ -1,0 +1,39 @@
+# Azure OpenAI Configuration
+# This file contains provider-specific configuration for Azure OpenAI
+# API keys and endpoints should be set via environment variables:
+# - AZURE_OPENAI_ENDPOINT
+# - AZURE_OPENAI_DEPLOYMENT_NAME
+# - AZURE_OPENAI_API_VERSION
+# - OPENAI_API_KEY (or use managed identity)
+
+llm:
+  # Basic LLM configuration
+  model: "gpt-4o-mini"
+  small_model: "gpt-4o-mini"
+  temperature: 0.0
+  max_tokens: 8192
+
+  # Azure OpenAI-specific parameters
+  model_parameters:
+    # Presence penalty to reduce repetition
+    presence_penalty: 0.0
+
+    # Frequency penalty to reduce repetition of frequent tokens
+    frequency_penalty: 0.0
+
+    # Alternative to temperature for nucleus sampling
+    top_p: 1.0
+
+    # Number of completions to generate
+    n: 1
+
+    # Whether to stream the response
+    stream: false
+
+    # Stop sequences
+    # stop: ["Human:", "Assistant:"]
+
+embedder:
+  # Basic embedder configuration
+  model: "text-embedding-3-small"
+  dimension: 1536

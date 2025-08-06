@@ -14,6 +14,7 @@ dependencies = [
     "fastapi>=0.109.0",
     "httpx>=0.27.0",
     "aiohttp>=3.12.14",
+    "pyyaml>=6.0.1",
 ]
 
 [project.optional-dependencies]
@@ -96,3 +97,10 @@ markers = [
     "e2e: End-to-end tests",
 ]
 asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=6.2.1",
+]

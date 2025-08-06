@@ -192,7 +192,7 @@ To use OpenAI instead of Ollama in Docker:
 
 3. **Set up environment variables** (optional):
    ```bash
-   cp sample_env.txt .env
+   cp .env.example .env
    # Edit .env with your configuration
    ```
 
@@ -203,10 +203,41 @@ To use OpenAI instead of Ollama in Docker:
 
 5. **Run the server**:
    ```bash
-   uv run src/graphiti_mcp_server.py.py --transport sse
+   uv run src/graphiti_mcp_server.py --transport sse
    ```
 
 ## Configuration
+
+The server supports multiple configuration methods with the following precedence (highest to lowest):
+1. **CLI arguments** (highest priority)
+2. **Environment variables**
+3. **YAML configuration files**
+4. **Default values** (lowest priority)
+
+### Configuration Methods
+
+#### YAML Configuration Files (Recommended)
+
+For complex configurations, you can use YAML files in the `config/` directory:
+
+```yaml
+# config/providers/ollama.yml
+llm:
+  model: "deepseek-r1:7b"
+  base_url: "http://localhost:11434/v1"
+  temperature: 0.1
+  max_tokens: 8192
+  model_parameters:
+    num_ctx: 4096          # Context window size
+    num_predict: -1        # Number of tokens to predict
+    repeat_penalty: 1.1    # Penalty for repeating tokens
+    top_k: 40             # Limit token selection to top K
+    top_p: 0.9            # Cumulative probability cutoff
+```
+
+See the [config/README.md](config/README.md) for detailed information about YAML configuration.
+
+#### Environment Variables
 
 The server uses the following environment variables:
 
@@ -225,6 +256,8 @@ The server now defaults to using **Ollama** for LLM operations and embeddings. Y
 - `OLLAMA_EMBEDDING_MODEL`: Ollama embedding model name (default: `nomic-embed-text`)
 - `OLLAMA_EMBEDDING_DIM`: Ollama embedding dimension (default: `768`)
 - `LLM_MAX_TOKENS`: Maximum tokens for LLM responses (default: `8192`)
+
+**Ollama Model Parameters:** You can now configure Ollama-specific model parameters like `num_ctx`, `top_p`, `repeat_penalty`, etc. using YAML configuration files. This provides fine-grained control over model behavior that wasn't previously available through environment variables alone.
 
 #### OpenAI Configuration (Alternative)
 To use OpenAI instead of Ollama, set `USE_OLLAMA=false` and configure:
@@ -258,13 +291,13 @@ You can set these variables in a `.env` file in the project directory. A sample 
 To run the Graphiti MCP server directly using `uv`:
 
 ```bash
-uv run src/graphiti_mcp_server.py.py
+uv run src/graphiti_mcp_server.py
 ```
 
 With options:
 
 ```bash
-uv run src/graphiti_mcp_server.py.py --model gpt-4.1-mini --transport sse
+uv run src/graphiti_mcp_server.py --model gpt-4.1-mini --transport sse
 ```
 
 Available arguments:
@@ -295,7 +328,7 @@ The Graphiti MCP server provides flexible configuration options for Ollama model
 **Use default models:**
 ```bash
 # With default .env configuration
-uv run src/graphiti_mcp_server.py.py
+uv run src/graphiti_mcp_server.py
 
 # Or explicitly set in .env file:
 # USE_OLLAMA=true
@@ -305,22 +338,22 @@ uv run src/graphiti_mcp_server.py.py
 
 **Use a different LLM model:**
 ```bash
-uv run src/graphiti_mcp_server.py.py --ollama-llm-model llama3.2:3b
+uv run src/graphiti_mcp_server.py --ollama-llm-model llama3.2:3b
 ```
 
 **Use a different embedding model with custom dimension:**
 ```bash
-uv run src/graphiti_mcp_server.py.py --ollama-embedding-model all-minilm-l6-v2 --ollama-embedding-dim 384
+uv run src/graphiti_mcp_server.py --ollama-embedding-model all-minilm-l6-v2 --ollama-embedding-dim 384
 ```
 
 **Use custom max tokens for larger responses:**
 ```bash
-uv run src/graphiti_mcp_server.py.py --max-tokens 32768
+uv run src/graphiti_mcp_server.py --max-tokens 32768
 ```
 
 **Connect to a remote Ollama server:**
 ```bash
-uv run src/graphiti_mcp_server.py.py --ollama-base-url http://remote-server:11434/v1 --ollama-llm-model llama3.2:8b
+uv run src/graphiti_mcp_server.py --ollama-base-url http://remote-server:11434/v1 --ollama-llm-model llama3.2:8b
 ```
 
 #### Environment Variable Configuration
@@ -346,7 +379,7 @@ LLM_MAX_TOKENS=32768
 Then run the server:
 
 ```bash
-uv run src/graphiti_mcp_server.py.py
+uv run src/graphiti_mcp_server.py
 ```
 
 #### Configuration Priority

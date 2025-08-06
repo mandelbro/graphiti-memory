@@ -1,0 +1,37 @@
+# OpenAI Configuration
+# This file contains provider-specific configuration for OpenAI
+# API keys should be set via OPENAI_API_KEY environment variable
+
+llm:
+  # Basic LLM configuration
+  model: "gpt-4o-mini"
+  small_model: "gpt-4o-mini"
+  base_url: "https://api.openai.com/v1"
+  temperature: 0.0
+  max_tokens: 8192
+
+  # OpenAI-specific parameters
+  model_parameters:
+    # Presence penalty to reduce repetition
+    presence_penalty: 0.0
+
+    # Frequency penalty to reduce repetition of frequent tokens
+    frequency_penalty: 0.0
+
+    # Alternative to temperature for nucleus sampling
+    top_p: 1.0
+
+    # Number of completions to generate
+    n: 1
+
+    # Whether to stream the response
+    stream: false
+
+    # Stop sequences
+    # stop: ["Human:", "Assistant:"]
+
+embedder:
+  # Basic embedder configuration
+  model: "text-embedding-3-small"
+  base_url: "https://api.openai.com/v1"
+  dimension: 1536
