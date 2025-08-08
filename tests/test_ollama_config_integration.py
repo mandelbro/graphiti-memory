@@ -5,6 +5,7 @@ Integration tests for Ollama configuration with model parameters.
 import os
 import tempfile
 from pathlib import Path
+from unittest.mock import patch, AsyncMock
 
 import pytest
 import yaml
@@ -198,6 +199,156 @@ class TestOllamaConfigIntegration:
                 assert hasattr(client, 'model_parameters')
                 assert client.model_parameters['num_ctx'] == 8192
                 assert client.model_parameters['top_p'] == 0.9
+
+            finally:
+                # Clean up environment variables
+                if 'USE_OLLAMA' in os.environ:
+                    del os.environ['USE_OLLAMA']
+
+                # Restore original config directory
+                config_loader.config_dir = original_config_dir
+
+    def test_ollama_client_native_api_integration(self):
+        """Test that OllamaClient properly integrates with native API for parameter loading."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_dir = Path(temp_dir)
+
+            # Create providers directory and ollama config with context parameters
+            providers_dir = config_dir / 'providers'
+            providers_dir.mkdir()
+
+            ollama_config = {
+                'llm': {
+                    'model': 'test-model:latest',
+                    'base_url': 'http://localhost:11434/v1',
+                    'model_parameters': {
+                        'num_ctx': 12000,
+                        'num_threads': 40,
+                        'repeat_penalty': 1.1,
+                        'top_p': 0.9
+                    }
+                }
+            }
+
+            config_file = providers_dir / 'ollama.yml'
+            with open(config_file, 'w') as f:
+                yaml.dump(ollama_config, f)
+
+            # Temporarily override the config loader's config directory
+            original_config_dir = config_loader.config_dir
+            config_loader.config_dir = config_dir
+
+            try:
+                # Set environment variables
+                os.environ['USE_OLLAMA'] = 'true'
+
+                # Create the configuration and client
+                llm_config = GraphitiLLMConfig.from_yaml_and_env()
+                client = llm_config.create_client()
+
+                # Verify the client has the expected configuration
+                assert client.__class__.__name__ == 'OllamaClient'
+                assert hasattr(client, 'model_parameters')
+                assert client.model_parameters['num_ctx'] == 12000
+                assert client.model_parameters['num_threads'] == 40
+                assert client.model_parameters['repeat_penalty'] == 1.1
+                assert client.model_parameters['top_p'] == 0.9
+
+                # Verify the ollama_base_url is set correctly
+                assert hasattr(client, 'ollama_base_url')
+                assert client.ollama_base_url == 'http://localhost:11434/v1'
+
+            finally:
+                # Clean up environment variables
+                if 'USE_OLLAMA' in os.environ:
+                    del os.environ['USE_OLLAMA']
+
+                # Restore original config directory
+                config_loader.config_dir = original_config_dir
+
+    @pytest.mark.asyncio
+    async def test_ollama_native_api_call_integration(self):
+        """Test the complete flow of native API calls with parameters."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config_dir = Path(temp_dir)
+
+            # Create providers directory and ollama config
+            providers_dir = config_dir / 'providers'
+            providers_dir.mkdir()
+
+            ollama_config = {
+                'llm': {
+                    'model': 'integration-test:latest',
+                    'base_url': 'http://localhost:11434/v1',
+                    'model_parameters': {
+                        'num_ctx': 8192,
+                        'num_threads': 20,
+                        'temperature': 0.5
+                    }
+                }
+            }
+
+            config_file = providers_dir / 'ollama.yml'
+            with open(config_file, 'w') as f:
+                yaml.dump(ollama_config, f)
+
+            # Temporarily override the config loader's config directory
+            original_config_dir = config_loader.config_dir
+            config_loader.config_dir = config_dir
+
+            try:
+                # Set environment variables
+                os.environ['USE_OLLAMA'] = 'true'
+
+                # Create the configuration and client
+                llm_config = GraphitiLLMConfig.from_yaml_and_env()
+                client = llm_config.create_client()
+
+                # Mock the native API call
+                with patch('httpx.AsyncClient') as mock_client_class:
+                    mock_client = AsyncMock()
+                    mock_response = AsyncMock()
+                    mock_response.status_code = 200
+                    mock_response.raise_for_status = AsyncMock()
+                    mock_response.json.return_value = {
+                        "model": "integration-test:latest",
+                        "response": "Integration test response",
+                        "done": True
+                    }
+                    mock_client.post.return_value = mock_response
+                    mock_client.__aenter__.return_value = mock_client
+                    mock_client.__aexit__.return_value = None
+                    mock_client_class.return_value = mock_client
+
+                    # Test the native API completion
+                    result = await client._create_completion(
+                        "integration-test:latest",
+                        [{"role": "user", "content": "Integration test prompt"}],
+                        0.5,
+                        100
+                    )
+
+                    # Verify the native API call was made correctly
+                    mock_client.post.assert_called_once()
+                    call_args = mock_client.post.call_args
+
+                    # Check URL (should be converted from /v1 to native)
+                    assert call_args[0][0] == "http://localhost:11434/api/generate"
+
+                    # Check payload structure
+                    payload = call_args[1]['json']
+                    assert payload['model'] == "integration-test:latest"
+                    assert payload['prompt'] == "User: Integration test prompt"
+                    assert payload['stream'] is False
+
+                    # Check that all parameters were included
+                    options = payload['options']
+                    assert options['num_ctx'] == 8192
+                    assert options['num_threads'] == 20
+                    assert options['temperature'] == 0.5  # From payload overrides config
+
+                    # Verify response conversion
+                    assert result.choices[0].message.content == "Integration test response"
 
             finally:
                 # Clean up environment variables

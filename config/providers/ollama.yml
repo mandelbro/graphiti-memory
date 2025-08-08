@@ -4,16 +4,16 @@
 
 llm:
   # Basic LLM configuration
-  model: "gpt-oss"
+  model: "gpt-oss:latest"
   base_url: "http://localhost:11434/v1"
   temperature: 0.1
-  max_tokens: 32768
+  max_tokens: 50000
 
   # Ollama-specific model parameters
   # These will be passed to the Ollama API in the request body
   model_parameters:
     # Context window size - number of tokens to consider for context
-    num_ctx: 50000
+    num_ctx: 15000
 
     # Number of tokens to predict (-1 for unlimited until stop)
     num_predict: -1
@@ -22,7 +22,7 @@ llm:
     repeat_penalty: 1.1
 
     # Limit the next token selection to the K most probable tokens
-    top_k: 80
+    top_k: 50
 
     # Cumulative probability cutoff for token selection
     top_p: 0.9
@@ -36,9 +36,15 @@ llm:
     # Stop sequences
     # stop: ["Human:", "Assistant:"]
 
+    # How long to keep model loaded in memory after use
+    # Examples: "5m" (5 minutes), "30s" (30 seconds), "2h" (2 hours)
+    # Special values: "0" (unload immediately), "-1" (keep forever)
+    # Can also be specified as integer seconds (e.g., 300 for 5 minutes)
+    # keep_alive: "5m"
+
 embedder:
   # Basic embedder configuration
-  model: "nomic-embed-text"
+  model: "nomic-embed-text:latest"
   base_url: "http://localhost:11434/v1"
   dimension: 768
 
@@ -46,3 +52,5 @@ embedder:
   model_parameters:
     # Options for the embedding model
     # truncate: true
+    # Context window size - number of tokens to consider for context
+    num_ctx: 10000
