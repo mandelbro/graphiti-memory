@@ -1,0 +1,41 @@
+# Example local override configuration for Ollama
+# Copy this file to ollama.local.yml and modify as needed
+# This file overrides settings in ollama.yml
+
+llm:
+  # Override the model
+  # model: "llama3.1:8b"
+
+  # Override the base URL if running Ollama on a different port
+  # base_url: "http://localhost:11435/v1"
+
+  # Override temperature for experimentation
+  # temperature: 0.3
+
+  # Override max tokens
+  # max_tokens: 4096
+
+  # Override model parameters
+  model_parameters:
+    # Adjust context window
+    # num_ctx: 8192
+
+    # Change keep_alive time
+    # keep_alive: "30m"
+
+    # Adjust temperature at model level
+    # temperature: 0.2
+
+embedder:
+  # Override embedding model
+  # model: "mxbai-embed-large:latest"
+
+  # Override base URL for embeddings
+  # base_url: "http://localhost:11435/v1"
+
+  # Override embedding dimension
+  # dimension: 1024
+
+  # Override embedding model parameters
+  model_parameters:
+    # num_ctx: 8192

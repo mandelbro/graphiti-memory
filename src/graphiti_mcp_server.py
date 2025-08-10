@@ -212,14 +212,11 @@ class GraphitiLLMConfig(BaseModel):
     @classmethod
     def from_yaml_and_env(cls) -> 'GraphitiLLMConfig':
         """Create LLM configuration from YAML files and environment variables."""
-        # Start with defaults
-        config_data = {}
-
         # Check if Ollama should be used (default to True)
         use_ollama = config_loader.get_env_value('USE_OLLAMA', 'true', str).lower() == 'true'
 
         if use_ollama:
-            # Load Ollama YAML configuration
+            # Load Ollama YAML configuration (with local overrides)
             try:
                 yaml_config = config_loader.load_provider_config('ollama')
                 llm_config = yaml_config.get('llm', {})
@@ -227,15 +224,11 @@ class GraphitiLLMConfig(BaseModel):
                 logger.warning(f"Failed to load Ollama YAML configuration: {e}")
                 llm_config = {}
 
-            # Merge YAML config with environment variables (env vars take precedence)
-            ollama_base_url = config_loader.get_env_value('OLLAMA_BASE_URL',
-                                                        llm_config.get('base_url', 'http://localhost:11434/v1'))
-            ollama_llm_model = config_loader.get_env_value('OLLAMA_LLM_MODEL',
-                                                         llm_config.get('model', DEFAULT_LLM_MODEL))
-            temperature = config_loader.get_env_value('LLM_TEMPERATURE',
-                                                    llm_config.get('temperature', 0.0), float)
-            max_tokens = config_loader.get_env_value('LLM_MAX_TOKENS',
-                                                   llm_config.get('max_tokens', 8192), int)
+            # Use YAML config values with fallback to defaults
+            ollama_base_url = llm_config.get('base_url', 'http://localhost:11434/v1')
+            ollama_llm_model = llm_config.get('model', DEFAULT_LLM_MODEL)
+            temperature = llm_config.get('temperature', 0.0)
+            max_tokens = llm_config.get('max_tokens', 8192)
 
             # Get Ollama model parameters from YAML
             ollama_model_parameters = llm_config.get('model_parameters', {})
@@ -258,10 +251,10 @@ class GraphitiLLMConfig(BaseModel):
 
             try:
                 if azure_openai_endpoint is not None:
-                    # Azure OpenAI configuration
+                    # Azure OpenAI configuration (with local overrides)
                     yaml_config = config_loader.load_provider_config('azure_openai')
                 else:
-                    # OpenAI configuration
+                    # OpenAI configuration (with local overrides)
                     yaml_config = config_loader.load_provider_config('openai')
 
                 llm_config = yaml_config.get('llm', {})
@@ -269,20 +262,14 @@ class GraphitiLLMConfig(BaseModel):
                 logger.warning(f"Failed to load OpenAI/Azure OpenAI YAML configuration: {e}")
                 llm_config = {}
 
-            # Get model from environment, or use YAML config, or use default
-            model_env = os.environ.get('MODEL_NAME', '')
-            model = model_env if model_env.strip() else llm_config.get('model', DEFAULT_LLM_MODEL)
-
-            small_model_env = os.environ.get('SMALL_MODEL_NAME', '')
-            small_model = small_model_env if small_model_env.strip() else llm_config.get('small_model', SMALL_LLM_MODEL)
-
-            temperature = config_loader.get_env_value('LLM_TEMPERATURE',
-                                                    llm_config.get('temperature', 0.0), float)
-            max_tokens = config_loader.get_env_value('LLM_MAX_TOKENS',
-                                                   llm_config.get('max_tokens', 8192), int)
+            # Use YAML config values with fallback to defaults
+            model = llm_config.get('model', DEFAULT_LLM_MODEL)
+            small_model = llm_config.get('small_model', SMALL_LLM_MODEL)
+            temperature = llm_config.get('temperature', 0.0)
+            max_tokens = llm_config.get('max_tokens', 8192)
 
             if azure_openai_endpoint is not None:
-                # Azure OpenAI setup
+                # Azure OpenAI setup - still use environment variables for sensitive config
                 azure_openai_api_version = os.environ.get('AZURE_OPENAI_API_VERSION', None)
                 azure_openai_deployment_name = os.environ.get('AZURE_OPENAI_DEPLOYMENT_NAME', None)
                 azure_openai_use_managed_identity = (
@@ -308,7 +295,7 @@ class GraphitiLLMConfig(BaseModel):
                     use_ollama=False,
                 )
             else:
-                # OpenAI setup
+                # OpenAI setup - still use environment variables for API key
                 return cls(
                     api_key=os.environ.get('OPENAI_API_KEY'),
                     model=model,

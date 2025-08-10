@@ -1,25 +1,49 @@
 # Configuration Directory
 
-This directory contains YAML-based configuration files for the Graphiti MCP Server. The configuration system supports a clear hierarchy of precedence:
+This directory contains YAML-based configuration files for the Graphiti MCP Server. The configuration system supports different hierarchies for different types of configuration:
 
+## Provider Configuration Hierarchy
+For provider-specific settings (models, URLs, parameters):
+1. **Default values** (lowest priority) - defined in code
+2. **Base YAML files** - e.g., `providers/ollama.yml`
+3. **Local override files** - e.g., `providers/ollama.local.yml`
+4. **CLI arguments** (highest priority) - passed when starting the server
+
+## Other Configuration Hierarchy
+For general settings and sensitive data:
 1. **Default values** (lowest priority) - defined in code
 2. **YAML configuration files** - defined in this directory
-3. **Environment variables** - set in your environment or .env file
+3. **Environment variables** - for sensitive data like API keys
 4. **CLI arguments** (highest priority) - passed when starting the server
 
 ## Directory Structure
 
 ```
 config/
-├── providers/           # Provider-specific configurations
-│   ├── ollama.yml      # Ollama configuration and model parameters
-│   ├── openai.yml      # OpenAI configuration
-│   └── azure_openai.yml # Azure OpenAI configuration
+├── providers/              # Provider-specific configurations
+│   ├── ollama.yml         # Base Ollama configuration
+│   ├── ollama.local.yml   # Local Ollama overrides (optional)
+│   ├── openai.yml         # Base OpenAI configuration
+│   ├── openai.local.yml   # Local OpenAI overrides (optional)
+│   ├── azure_openai.yml   # Base Azure OpenAI configuration
+│   ├── azure_openai.local.yml # Local Azure OpenAI overrides (optional)
+│   └── ollama.local.yml.example # Example local override file
 ├── database/
-│   └── neo4j.yml       # Neo4j database configuration
-├── server.yml          # General server configuration
-└── README.md           # This file
+│   └── neo4j.yml          # Neo4j database configuration
+├── server.yml             # General server configuration
+└── README.md              # This file
 ```
+
+## Local Override Files
+
+Local override files (`.local.yml`) allow you to customize configuration without modifying the base files. This is perfect for:
+- Personal development settings
+- Environment-specific configurations
+- Experimenting with different models or parameters
+
+**Example**: Copy `providers/ollama.local.yml.example` to `providers/ollama.local.yml` and modify as needed.
+
+**Git**: Local override files should be added to `.gitignore` to prevent committing personal settings.
 
 ## Provider Configuration
 
@@ -77,38 +101,51 @@ llm:
   max_tokens: 8192
 ```
 
-## Environment Variable Override
+## Environment Variables
 
-You can still use environment variables to override any YAML configuration:
+Environment variables are now primarily used for sensitive credentials and system-level configuration:
 
 ```bash
-# Override Ollama model
-export OLLAMA_LLM_MODEL="llama2:13b"
+# Required for OpenAI/Azure providers
+export OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
 
-# Override temperature
-export LLM_TEMPERATURE="0.7"
-
-# Override max tokens
-export LLM_MAX_TOKENS="16384"
+# System configuration
+export USE_OLLAMA="true"
+export NEO4J_PASSWORD="your-password"
 ```
 
-## Security Note
+**Note**: Provider-specific settings (models, URLs, parameters) are no longer configurable via environment variables. Use local override files instead.
 
-**API keys and sensitive credentials should still be set via environment variables for security:**
+## Configuration Examples
 
-- `OPENAI_API_KEY`
-- `AZURE_OPENAI_ENDPOINT`
-- `NEO4J_PASSWORD`
-- etc.
+### Using Local Overrides
 
-## Configuration Precedence Examples
+1. **Base configuration** (`providers/ollama.yml`):
+```yaml
+llm:
+  model: "gpt-oss:latest"
+  temperature: 0.1
+  max_tokens: 50000
+```
 
-If you have:
-1. YAML config: `temperature: 0.1`
-2. Environment variable: `LLM_TEMPERATURE=0.5`
-3. CLI argument: `--temperature 0.7`
+2. **Local override** (`providers/ollama.local.yml`):
+```yaml
+llm:
+  model: "llama3.1:8b"
+  temperature: 0.3
+```
 
-The final temperature will be `0.7` (CLI argument wins).
+3. **Result**: Model and temperature from local file, max_tokens from base file.
+
+### CLI Override Example
+
+```bash
+# Override any setting via CLI
+uv run src/graphiti_mcp_server.py --temperature 0.7
+```
+
+CLI arguments always take highest precedence.
 
 ## Adding New Providers
 

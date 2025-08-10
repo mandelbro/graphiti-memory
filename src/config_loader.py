@@ -2,11 +2,23 @@
 Configuration loader for YAML-based configuration files.
 
 This module provides utilities for loading and merging YAML configuration files
-with environment variables and CLI arguments, following the precedence:
+with environment variables and CLI arguments. The configuration hierarchy is:
+
+For provider configurations:
+1. Default values (lowest priority)
+2. Base YAML configuration files (e.g., providers/ollama.yml)
+3. Local override YAML files (e.g., providers/ollama.local.yml)
+4. CLI arguments (highest priority)
+
+For other configurations:
 1. Default values (lowest priority)
 2. YAML configuration files
-3. Environment variables
+3. Environment variables (for sensitive data like API keys)
 4. CLI arguments (highest priority)
+
+Note: Provider-specific configuration values (models, URLs, parameters) are no
+longer overrideable via environment variables for cleaner configuration management.
+Use local override files (*.local.yml) instead.
 """
 
 import os
@@ -69,15 +81,29 @@ class ConfigLoader:
 
     def load_provider_config(self, provider: str) -> Dict[str, Any]:
         """
-        Load provider-specific configuration.
+        Load provider-specific configuration with local override support.
+
+        Loads the base configuration from providers/{provider}.yml and merges it
+        with local overrides from providers/{provider}.local.yml if it exists.
 
         Args:
             provider: Provider name (e.g., 'ollama', 'openai', 'azure_openai')
 
         Returns:
-            Dictionary containing the provider configuration
+            Dictionary containing the merged provider configuration
         """
-        return self.load_yaml_config(f"providers/{provider}.yml")
+        # Load base configuration
+        base_config = self.load_yaml_config(f"providers/{provider}.yml")
+
+        # Load local override configuration if it exists
+        local_config = self.load_yaml_config(f"providers/{provider}.local.yml")
+
+        # Merge configurations with local taking precedence
+        if local_config:
+            logger.debug(f"Found local overrides for {provider} provider")
+            return self.merge_configs(base_config, local_config)
+
+        return base_config
 
     def load_database_config(self, database: str = "neo4j") -> Dict[str, Any]:
         """
