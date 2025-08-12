@@ -14,8 +14,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from oauth_wrapper import app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from src.oauth_wrapper import app
 
 # Mark all tests in this module as integration tests
 pytestmark = pytest.mark.integration
@@ -61,7 +61,7 @@ class TestOAuthIntegration:
             "client_name": "Integration Test Client",
             "redirect_uris": ["http://localhost:3000/callback"],
             "grant_types": ["authorization_code"],
-            "response_types": ["code"]
+            "response_types": ["code"],
         }
 
         reg_response = client.post("/register", json=registration_data)
@@ -87,23 +87,25 @@ class TestOAuthIntegration:
             # Mock the stream response
             mock_stream_response = AsyncMock()
             mock_stream_response.aiter_bytes = AsyncMock()
-            mock_stream_response.aiter_bytes.return_value = self._async_generator([b"data: test\n\n"])
-            mock_instance.stream.return_value.__aenter__.return_value = mock_stream_response
+            mock_stream_response.aiter_bytes.return_value = self._async_generator(
+                [b"data: test\n\n"]
+            )
+            mock_instance.stream.return_value.__aenter__.return_value = (
+                mock_stream_response
+            )
 
             response = client.get("/sse", headers={"Accept": "text/event-stream"})
 
             # Verify SSE response format
             assert response.status_code == 200
-            assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+            assert (
+                response.headers["content-type"] == "text/event-stream; charset=utf-8"
+            )
 
     def test_messages_endpoint_with_session(self, client, mock_env):
         """Test messages endpoint with session management"""
         session_id = "test-session-123"
-        message_data = {
-            "type": "request",
-            "method": "tools/list",
-            "params": {}
-        }
+        message_data = {"type": "request", "method": "tools/list", "params": {}}
 
         with patch("src.oauth_wrapper.httpx.AsyncClient") as mock_client_class:
             mock_instance = AsyncMock()
@@ -111,14 +113,15 @@ class TestOAuthIntegration:
 
             mock_response = AsyncMock()
             mock_response.status_code = 200
-            mock_response.content = json.dumps({
-                "type": "response",
-                "result": {"tools": []}
-            }).encode()
+            mock_response.content = json.dumps(
+                {"type": "response", "result": {"tools": []}}
+            ).encode()
             mock_response.headers = {"content-type": "application/json"}
             mock_instance.post.return_value = mock_response
 
-            response = client.post(f"/messages/?session_id={session_id}", json=message_data)
+            response = client.post(
+                f"/messages/?session_id={session_id}", json=message_data
+            )
 
             assert response.status_code == 200
             assert response.json() == {"type": "response", "result": {"tools": []}}

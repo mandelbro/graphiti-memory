@@ -1,9 +1,5 @@
 """Tests for schema generation in FastMCP and Pydantic models."""
 
-import json
-import asyncio
-from typing import List, Union
-
 import pytest
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel
@@ -12,25 +8,29 @@ from pydantic import BaseModel
 # Shared model classes for testing
 class ErrorResponse(BaseModel):
     """Error response model."""
+
     error: str
 
 
 class NodeResult(BaseModel):
     """Node result model."""
+
     uuid: str
     name: str
-    labels: List[str]
+    labels: list[str]
 
 
 class NodeSearchResponse(BaseModel):
     """Node search response model."""
+
     message: str
-    nodes: List[NodeResult]
+    nodes: list[NodeResult]
 
 
 class UnionTestModel(BaseModel):
     """Test model for Union type schema generation."""
-    result: Union[NodeSearchResponse, ErrorResponse]
+
+    result: NodeSearchResponse | ErrorResponse
 
 
 def test_pydantic_schema_generation():
@@ -74,7 +74,11 @@ def test_pydantic_union_schema_generation():
 
     # Verify the Union is properly represented
     result_property = properties["result"]
-    assert "anyOf" in result_property or "oneOf" in result_property or "$ref" in result_property
+    assert (
+        "anyOf" in result_property
+        or "oneOf" in result_property
+        or "$ref" in result_property
+    )
 
 
 def test_fastmcp_tool_registration():
@@ -83,7 +87,7 @@ def test_fastmcp_tool_registration():
     test_mcp = FastMCP("test")
 
     @test_mcp.tool()
-    async def test_tool(query: str) -> Union[NodeSearchResponse, ErrorResponse]:
+    async def test_tool(query: str) -> NodeSearchResponse | ErrorResponse:
         """Test tool with Union return type."""
         return NodeSearchResponse(message="test", nodes=[])
 
@@ -96,13 +100,14 @@ def test_fastmcp_tool_registration():
 @pytest.mark.asyncio
 async def test_tool_function_execution():
     """Test that a tool function with Union return type executes correctly."""
-    async def test_tool(query: str) -> Union[NodeSearchResponse, ErrorResponse]:
+
+    async def test_tool(query: str) -> NodeSearchResponse | ErrorResponse:
         """Test tool that returns a valid response."""
         return NodeSearchResponse(
             message=f"Search completed for: {query}",
             nodes=[
                 NodeResult(uuid="test-uuid", name="test-node", labels=["TestLabel"])
-            ]
+            ],
         )
 
     # Execute the tool function directly

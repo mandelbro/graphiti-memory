@@ -30,9 +30,21 @@ lint:
 	$(RUFF) check
 	$(PYRIGHT) .
 
+lint-file:
+	$(RUFF) check $(FILE)
+	$(PYRIGHT) $(FILE)
+
 # Run tests
 test:
-	$(PYTEST)
+	$(PYTEST) $(if $(ARGS),$(ARGS),)
+
+# Run a specific test file
+test-file:
+	$(PYTEST) $(FILE) -v
+
+# Run tests with coverage
+test-cov:
+	$(PYTEST) --cov=src --cov-report=term-missing --cov-report=html
 
 # Run only unit tests (skip integration tests)
 test-unit:
@@ -78,7 +90,9 @@ help:
 	@echo "  install-dev - Install development dependencies"
 	@echo "  format      - Format code with ruff"
 	@echo "  lint        - Lint code with ruff and pyright"
-	@echo "  test        - Run tests with pytest"
+	@echo "  test        - Run tests with pytest (use ARGS=... for arguments)"
+	@echo "  test-file   - Run specific test file (use FILE=path/to/test.py)"
+	@echo "  test-cov    - Run tests with coverage reporting"
 	@echo "  check       - Run format, lint, and test"
 	@echo "  clean       - Clean up generated files"
 	@echo "  all         - Run format, lint, and test (default)"

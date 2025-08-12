@@ -12,8 +12,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from oauth_wrapper import app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from src.oauth_wrapper import app
 
 
 class TestOAuthWrapperSimple:
@@ -70,7 +70,7 @@ class TestOAuthWrapperSimple:
         """Test successful client registration"""
         client_data = {
             "client_name": "Test Client",
-            "redirect_uris": ["http://localhost:3000/callback"]
+            "redirect_uris": ["http://localhost:3000/callback"],
         }
 
         response = client.post("/register", json=client_data)
@@ -131,7 +131,6 @@ class TestOAuthWrapperSimple:
         # Test that the MCP_INTERNAL_PORT environment variable is used
         import os
 
-
         # Verify that the environment variable is read
         assert os.environ.get("MCP_INTERNAL_PORT") == "8021"
 
@@ -148,9 +147,11 @@ class TestOAuthWrapperSimple:
             mock_instance.post.return_value = mock_response
 
             # Send request with host header
-            response = client.post("/messages/",
-                                 json={"test": "data"},
-                                 headers={"host": "example.com", "custom": "value"})
+            response = client.post(
+                "/messages/",
+                json={"test": "data"},
+                headers={"host": "example.com", "custom": "value"},
+            )
 
             assert response.status_code == 200
             # The test passes if no exception is raised during header processing
@@ -168,8 +169,9 @@ class TestOAuthWrapperSimple:
             mock_instance.post.return_value = mock_response
 
             # Send request with query parameters
-            response = client.post("/messages/?session_id=123&param=value",
-                                 json={"test": "data"})
+            response = client.post(
+                "/messages/?session_id=123&param=value", json={"test": "data"}
+            )
 
             assert response.status_code == 200
             # Verify the mock was called (indicating proxying occurred)

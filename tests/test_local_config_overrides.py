@@ -6,8 +6,8 @@ ensuring that providers/{name}.local.yml files properly override base configurat
 """
 
 import tempfile
-import pytest
 from pathlib import Path
+
 from src.config_loader import ConfigLoader
 
 
@@ -23,22 +23,23 @@ class TestLocalConfigOverrides:
 
             # Create base config
             base_config = {
-                'llm': {
-                    'model': 'base-model',
-                    'temperature': 0.1,
-                    'base_url': 'http://localhost:11434/v1'
+                "llm": {
+                    "model": "base-model",
+                    "temperature": 0.1,
+                    "base_url": "http://localhost:11434/v1",
                 }
             }
 
             import yaml
-            with open(providers_dir / "test.yml", 'w') as f:
+
+            with open(providers_dir / "test.yml", "w") as f:
                 yaml.dump(base_config, f)
 
             # Initialize config loader
             loader = ConfigLoader(config_dir)
 
             # Load config
-            result = loader.load_provider_config('test')
+            result = loader.load_provider_config("test")
 
             # Should return base config as-is
             assert result == base_config
@@ -52,44 +53,45 @@ class TestLocalConfigOverrides:
 
             # Create base config
             base_config = {
-                'llm': {
-                    'model': 'base-model',
-                    'temperature': 0.1,
-                    'base_url': 'http://localhost:11434/v1',
-                    'max_tokens': 8192
+                "llm": {
+                    "model": "base-model",
+                    "temperature": 0.1,
+                    "base_url": "http://localhost:11434/v1",
+                    "max_tokens": 8192,
                 }
             }
 
             # Create local override config
             local_config = {
-                'llm': {
-                    'model': 'override-model',
-                    'temperature': 0.3,
-                    'max_tokens': 4096
+                "llm": {
+                    "model": "override-model",
+                    "temperature": 0.3,
+                    "max_tokens": 4096,
                     # Note: base_url not overridden
                 }
             }
 
             import yaml
-            with open(providers_dir / "test.yml", 'w') as f:
+
+            with open(providers_dir / "test.yml", "w") as f:
                 yaml.dump(base_config, f)
 
-            with open(providers_dir / "test.local.yml", 'w') as f:
+            with open(providers_dir / "test.local.yml", "w") as f:
                 yaml.dump(local_config, f)
 
             # Initialize config loader
             loader = ConfigLoader(config_dir)
 
             # Load config
-            result = loader.load_provider_config('test')
+            result = loader.load_provider_config("test")
 
             # Should have merged config with local overrides taking precedence
             expected = {
-                'llm': {
-                    'model': 'override-model',  # Overridden
-                    'temperature': 0.3,         # Overridden
-                    'base_url': 'http://localhost:11434/v1',  # From base
-                    'max_tokens': 4096          # Overridden
+                "llm": {
+                    "model": "override-model",  # Overridden
+                    "temperature": 0.3,  # Overridden
+                    "base_url": "http://localhost:11434/v1",  # From base
+                    "max_tokens": 4096,  # Overridden
                 }
             }
 
@@ -104,49 +106,50 @@ class TestLocalConfigOverrides:
 
             # Create base config with nested structure
             base_config = {
-                'llm': {
-                    'model': 'base-model',
-                    'model_parameters': {
-                        'num_ctx': 4096,
-                        'temperature': 0.1,
-                        'top_k': 50
-                    }
+                "llm": {
+                    "model": "base-model",
+                    "model_parameters": {
+                        "num_ctx": 4096,
+                        "temperature": 0.1,
+                        "top_k": 50,
+                    },
                 }
             }
 
             # Create local override with partial nested override
             local_config = {
-                'llm': {
-                    'model_parameters': {
-                        'num_ctx': 8192,
-                        'temperature': 0.3
+                "llm": {
+                    "model_parameters": {
+                        "num_ctx": 8192,
+                        "temperature": 0.3,
                         # Note: top_k not overridden
                     }
                 }
             }
 
             import yaml
-            with open(providers_dir / "test.yml", 'w') as f:
+
+            with open(providers_dir / "test.yml", "w") as f:
                 yaml.dump(base_config, f)
 
-            with open(providers_dir / "test.local.yml", 'w') as f:
+            with open(providers_dir / "test.local.yml", "w") as f:
                 yaml.dump(local_config, f)
 
             # Initialize config loader
             loader = ConfigLoader(config_dir)
 
             # Load config
-            result = loader.load_provider_config('test')
+            result = loader.load_provider_config("test")
 
             # Should have deep merged config
             expected = {
-                'llm': {
-                    'model': 'base-model',  # From base
-                    'model_parameters': {
-                        'num_ctx': 8192,    # Overridden
-                        'temperature': 0.3,  # Overridden
-                        'top_k': 50         # From base
-                    }
+                "llm": {
+                    "model": "base-model",  # From base
+                    "model_parameters": {
+                        "num_ctx": 8192,  # Overridden
+                        "temperature": 0.3,  # Overridden
+                        "top_k": 50,  # From base
+                    },
                 }
             }
 
@@ -163,7 +166,7 @@ class TestLocalConfigOverrides:
             loader = ConfigLoader(config_dir)
 
             # Load non-existent config
-            result = loader.load_provider_config('nonexistent')
+            result = loader.load_provider_config("nonexistent")
 
             # Should return empty dict
             assert result == {}
@@ -176,22 +179,18 @@ class TestLocalConfigOverrides:
             providers_dir.mkdir()
 
             # Create only local config (no base)
-            local_config = {
-                'llm': {
-                    'model': 'local-only-model',
-                    'temperature': 0.5
-                }
-            }
+            local_config = {"llm": {"model": "local-only-model", "temperature": 0.5}}
 
             import yaml
-            with open(providers_dir / "test.local.yml", 'w') as f:
+
+            with open(providers_dir / "test.local.yml", "w") as f:
                 yaml.dump(local_config, f)
 
             # Initialize config loader
             loader = ConfigLoader(config_dir)
 
             # Load config
-            result = loader.load_provider_config('test')
+            result = loader.load_provider_config("test")
 
             # Should return only the local config
             assert result == local_config

@@ -2,12 +2,13 @@
 Comprehensive tests for the OllamaClient implementation.
 """
 
-import pytest
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
-from typing import Dict, Any
-import httpx
 
+import httpx
+import pytest
 from graphiti_core.llm_client.config import LLMConfig
+from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
 
 from src.ollama_client import OllamaClient
@@ -15,6 +16,7 @@ from src.ollama_client import OllamaClient
 
 class MockResponseModel(BaseModel):
     """Mock response model for testing."""
+
     test_field: str = "test_value"
 
 
@@ -37,7 +39,7 @@ class TestOllamaClientComprehensive:
             model="test_model",
             base_url="http://localhost:11434/v1",
             temperature=0.5,
-            max_tokens=1000
+            max_tokens=1000,
         )
 
     @pytest.fixture
@@ -50,27 +52,31 @@ class TestOllamaClientComprehensive:
             "top_k": 40,
             "top_p": 0.9,
             "temperature": 0.2,
-            "seed": 42
+            "seed": 42,
         }
 
-    def test_ollama_client_initialization_with_config(self, llm_config, model_parameters):
+    def test_ollama_client_initialization_with_config(
+        self, llm_config, model_parameters
+    ):
         """Test OllamaClient initialization with configuration."""
         client = OllamaClient(
             config=llm_config,
             cache=False,  # Caching not implemented in base class
             max_tokens=2000,
-            model_parameters=model_parameters
+            model_parameters=model_parameters,
         )
 
         assert client.model_parameters == model_parameters
-        assert hasattr(client, 'client')
+        assert hasattr(client, "client")
 
-    def test_ollama_client_initialization_with_mock_client(self, mock_openai_client, llm_config, model_parameters):
+    def test_ollama_client_initialization_with_mock_client(
+        self, mock_openai_client, llm_config, model_parameters
+    ):
         """Test OllamaClient initialization with mock client."""
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters=model_parameters
+            model_parameters=model_parameters,
         )
 
         assert client.client == mock_openai_client
@@ -81,7 +87,7 @@ class TestOllamaClientComprehensive:
         client = OllamaClient(model_parameters=model_parameters)
 
         assert client.model_parameters == model_parameters
-        assert hasattr(client, 'client')
+        assert hasattr(client, "client")
 
     def test_ollama_client_initialization_no_model_parameters(self, llm_config):
         """Test OllamaClient initialization without model parameters."""
@@ -90,7 +96,9 @@ class TestOllamaClientComprehensive:
         assert client.model_parameters == {}
 
     @pytest.mark.asyncio
-    async def test_create_structured_completion_with_model_parameters(self, mock_openai_client, llm_config, model_parameters):
+    async def test_create_structured_completion_with_model_parameters(
+        self, mock_openai_client, llm_config, model_parameters
+    ):
         """Test structured completion with model parameters."""
         # Setup - mock the _create_completion method since that's what gets called now
         expected_response = MagicMock()
@@ -98,7 +106,7 @@ class TestOllamaClientComprehensive:
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters=model_parameters
+            model_parameters=model_parameters,
         )
 
         # Mock the _create_completion method that _create_structured_completion now calls
@@ -106,7 +114,10 @@ class TestOllamaClientComprehensive:
 
         # Test data
         model = "test_model"
-        messages = [{"role": "user", "content": "test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "test message"}],
+        )
         temperature = 0.7
         max_tokens = 500
 
@@ -116,7 +127,7 @@ class TestOllamaClientComprehensive:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_model=MockResponseModel
+            response_model=MockResponseModel,
         )
 
         # Verify - the method now falls back to _create_completion
@@ -126,13 +137,15 @@ class TestOllamaClientComprehensive:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_model=MockResponseModel
+            response_model=MockResponseModel,
         )
         # Beta API should not be called
         mock_openai_client.beta.chat.completions.parse.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_create_structured_completion_without_model_parameters(self, mock_openai_client, llm_config):
+    async def test_create_structured_completion_without_model_parameters(
+        self, mock_openai_client, llm_config
+    ):
         """Test structured completion without model parameters."""
         # Setup - mock the _create_completion method instead since that's what gets called now
         expected_response = MagicMock()
@@ -140,7 +153,7 @@ class TestOllamaClientComprehensive:
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters={}  # Empty model parameters
+            model_parameters={},  # Empty model parameters
         )
 
         # Mock the _create_completion method that _create_structured_completion now calls
@@ -148,7 +161,10 @@ class TestOllamaClientComprehensive:
 
         # Test data
         model = "test_model"
-        messages = [{"role": "user", "content": "test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "test message"}],
+        )
         temperature = 0.7
         max_tokens = 500
 
@@ -158,7 +174,7 @@ class TestOllamaClientComprehensive:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_model=MockResponseModel
+            response_model=MockResponseModel,
         )
 
         # Verify - the method now falls back to _create_completion
@@ -168,7 +184,7 @@ class TestOllamaClientComprehensive:
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_model=MockResponseModel
+            response_model=MockResponseModel,
         )
         # Beta API should not be called
         mock_openai_client.beta.chat.completions.parse.assert_not_called()
@@ -176,27 +192,22 @@ class TestOllamaClientComprehensive:
     @pytest.mark.asyncio
     async def test_structured_completion_integration_with_native_api(self, llm_config):
         """Test complete integration of structured completion with native API fallback."""
-        model_parameters = {
-            "num_ctx": 8192,
-            "temperature": 0.3,
-            "top_p": 0.9
-        }
+        model_parameters = {"num_ctx": 8192, "temperature": 0.3, "top_p": 0.9}
 
-        client = OllamaClient(
-            config=llm_config,
-            model_parameters=model_parameters
-        )
+        client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
         # Mock both the model loading and actual completion calls
-        with patch('httpx.AsyncClient') as mock_native_client_class:
+        with patch("httpx.AsyncClient") as mock_native_client_class:
             # Setup native API mock for model loading and completion
             mock_native_client = AsyncMock()
-            mock_native_response = AsyncMock()
+            mock_native_response = (
+                MagicMock()
+            )  # Use MagicMock for response, not AsyncMock
             mock_native_response.status_code = 200
-            mock_native_response.raise_for_status = AsyncMock()
+            mock_native_response.raise_for_status = MagicMock()  # Synchronous method
             mock_native_response.json.return_value = {
                 "response": "Integration test response from native API",
-                "done": True
+                "done": True,
             }
             mock_native_client.post.return_value = mock_native_response
             mock_native_client.__aenter__.return_value = mock_native_client
@@ -205,7 +216,10 @@ class TestOllamaClientComprehensive:
 
             # Test data
             model = "integration_test_model"
-            messages = [{"role": "user", "content": "Integration test message"}]
+            messages = cast(
+                list[ChatCompletionMessageParam],
+                [{"role": "user", "content": "Integration test message"}],
+            )
             temperature = 0.2
             max_tokens = 200
 
@@ -215,18 +229,23 @@ class TestOllamaClientComprehensive:
                 messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                response_model=MockResponseModel
+                response_model=MockResponseModel,
             )
 
             # Verify that native API was called for the completion
             # Since structured completion falls back to _create_completion, which uses native API
-            assert mock_native_client.post.call_count >= 1  # At least one call for completion
+            assert (
+                mock_native_client.post.call_count >= 1
+            )  # At least one call for completion
 
             # Verify result structure
-            assert hasattr(result, 'choices')
+            assert hasattr(result, "choices")
             assert len(result.choices) > 0
-            assert hasattr(result.choices[0], 'message')
-            assert result.choices[0].message.content == "Integration test response from native API"
+            assert hasattr(result.choices[0], "message")
+            assert (
+                result.choices[0].message.content
+                == "Integration test response from native API"
+            )
 
     @pytest.mark.asyncio
     async def test_structured_completion_error_handling(self, llm_config):
@@ -239,7 +258,10 @@ class TestOllamaClientComprehensive:
 
         # Test data
         model = "error_test_model"
-        messages = [{"role": "user", "content": "Error test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "Error test message"}],
+        )
 
         # Execute and verify exception is propagated
         with pytest.raises(Exception) as exc_info:
@@ -248,7 +270,7 @@ class TestOllamaClientComprehensive:
                 messages=messages,
                 temperature=0.1,
                 max_tokens=100,
-                response_model=MockResponseModel
+                response_model=MockResponseModel,
             )
 
         assert str(exc_info.value) == error_message
@@ -265,23 +287,22 @@ class TestOllamaClientComprehensive:
             "repeat_penalty": 1.1,
             "top_k": 50,
             "top_p": 0.9,
-            "num_threads": 40
+            "num_threads": 40,
         }
 
-        client = OllamaClient(
-            config=llm_config,
-            model_parameters=model_parameters
-        )
+        client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
-        with patch('httpx.AsyncClient') as mock_native_client_class:
+        with patch("httpx.AsyncClient") as mock_native_client_class:
             # Setup native API mock to return a proper response (not empty)
             mock_native_client = AsyncMock()
-            mock_native_response = AsyncMock()
+            mock_native_response = (
+                MagicMock()
+            )  # Use MagicMock for response, not AsyncMock
             mock_native_response.status_code = 200
-            mock_native_response.raise_for_status = AsyncMock()
+            mock_native_response.raise_for_status = MagicMock()  # Synchronous method
             mock_native_response.json.return_value = {
                 "response": "Processed episode content with entities and relationships extracted.",
-                "done": True
+                "done": True,
             }
             mock_native_client.post.return_value = mock_native_response
             mock_native_client.__aenter__.return_value = mock_native_client
@@ -289,13 +310,19 @@ class TestOllamaClientComprehensive:
             mock_native_client_class.return_value = mock_native_client
 
             # Simulate Graphiti episode processing call
-            messages = [{
-                "role": "system",
-                "content": "Extract entities and relationships from the following episode content."
-            }, {
-                "role": "user",
-                "content": "User Documentation Standards Preference: The user prefers clear, concise documentation."
-            }]
+            messages = cast(
+                list[ChatCompletionMessageParam],
+                [
+                    {
+                        "role": "system",
+                        "content": "Extract entities and relationships from the following episode content.",
+                    },
+                    {
+                        "role": "user",
+                        "content": "User Documentation Standards Preference: The user prefers clear, concise documentation.",
+                    },
+                ],
+            )
 
             # Execute structured completion (as Graphiti would do)
             result = await client._create_structured_completion(
@@ -303,15 +330,17 @@ class TestOllamaClientComprehensive:
                 messages=messages,
                 temperature=0.1,
                 max_tokens=8192,
-                response_model=MockResponseModel
+                response_model=MockResponseModel,
             )
 
             # Verify we get a non-empty response (the original issue was empty responses)
             assert result is not None
-            assert hasattr(result, 'choices')
+            assert hasattr(result, "choices")
             assert len(result.choices) > 0
-            assert hasattr(result.choices[0], 'message')
-            assert result.choices[0].message.content != ""  # This was the main issue - empty content
+            assert hasattr(result.choices[0], "message")
+            assert (
+                result.choices[0].message.content != ""
+            )  # This was the main issue - empty content
             assert "Processed episode content" in result.choices[0].message.content
 
             # Verify native API was called with correct parameters
@@ -319,94 +348,142 @@ class TestOllamaClientComprehensive:
 
             # Check that model parameters were included
             for call in mock_native_client.post.call_args_list:
-                if 'json' in call[1]:
-                    payload = call[1]['json']
-                    if 'options' in payload:
-                        assert payload['options']['num_ctx'] == 12000
+                if "json" in call[1]:
+                    payload = call[1]["json"]
+                    if "options" in payload:
+                        assert payload["options"]["num_ctx"] == 12000
                         break
 
     @pytest.mark.asyncio
-    async def test_create_completion_with_model_parameters(self, mock_openai_client, llm_config, model_parameters):
+    async def test_create_completion_with_model_parameters(
+        self, mock_openai_client, llm_config, model_parameters
+    ):
         """Test regular completion with model parameters."""
         # Setup
-        expected_response = MagicMock()
-        mock_openai_client.chat.completions.create.return_value = expected_response
-
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters=model_parameters
+            model_parameters=model_parameters,
         )
 
         # Test data
         model = "test_model"
-        messages = [{"role": "user", "content": "test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "test message"}],
+        )
         temperature = 0.7
         max_tokens = 500
 
-        # Execute
-        result = await client._create_completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
+        # Mock httpx.AsyncClient since _create_completion makes direct HTTP calls
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
+            mock_response.status_code = 200
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
+            mock_response.json.return_value = {"response": "Test response"}
+            mock_client.post.return_value = mock_response
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_class.return_value = mock_client
 
-        # Verify
-        assert result == expected_response
-        mock_openai_client.chat.completions.create.assert_called_once_with(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            extra_body=model_parameters
-        )
+            # Execute
+            result = await client._create_completion(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
+
+            # Verify the result
+            assert result is not None
+            assert hasattr(result, "choices")
+            assert len(result.choices) == 1
+            assert result.choices[0].message.content == "Test response"
+            assert result.model == model
+
+            # Verify the HTTP call was made with correct parameters
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert call_args[0][0].endswith("/api/generate")
+            payload = call_args[1]["json"]
+            assert payload["model"] == model
+            # Verify base model parameters are included
+            assert payload["options"]["num_ctx"] == model_parameters["num_ctx"]
+            assert (
+                payload["options"]["repeat_penalty"]
+                == model_parameters["repeat_penalty"]
+            )
+            assert payload["options"]["top_k"] == model_parameters["top_k"]
+            assert payload["options"]["top_p"] == model_parameters["top_p"]
+            assert payload["options"]["seed"] == model_parameters["seed"]
+            # Verify parameter overrides work
+            assert payload["options"]["temperature"] == temperature
+            assert payload["options"]["num_predict"] == max_tokens
 
     @pytest.mark.asyncio
-    async def test_create_completion_without_model_parameters(self, mock_openai_client, llm_config):
+    async def test_create_completion_without_model_parameters(
+        self, mock_openai_client, llm_config
+    ):
         """Test regular completion without model parameters."""
         # Setup
-        expected_response = MagicMock()
-        mock_openai_client.chat.completions.create.return_value = expected_response
-
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters=None  # No model parameters
+            model_parameters=None,  # No model parameters
         )
 
         # Test data
         model = "test_model"
-        messages = [{"role": "user", "content": "test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "test message"}],
+        )
         temperature = 0.7
         max_tokens = 500
 
-        # Execute
-        result = await client._create_completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_model=MockResponseModel
-        )
+        # Mock httpx.AsyncClient since _create_completion makes direct HTTP calls
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
+            mock_response.status_code = 200
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
+            mock_response.json.return_value = {"response": "Test response"}
+            mock_client.post.return_value = mock_response
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_class.return_value = mock_client
 
-        # Verify - should not include extra_body when no model parameters
-        assert result == expected_response
-        mock_openai_client.chat.completions.create.assert_called_once_with(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"}
-        )
+            # Execute
+            result = await client._create_completion(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_model=MockResponseModel,
+            )
 
-    def test_ollama_client_model_parameters_property(self, llm_config, model_parameters):
+            # Verify the result
+            assert result is not None
+            assert hasattr(result, "choices")
+            assert len(result.choices) == 1
+            assert result.choices[0].message.content == "Test response"
+            assert result.model == model
+
+            # Verify the HTTP call was made with empty options since no model parameters
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert call_args[0][0].endswith("/api/generate")
+            payload = call_args[1]["json"]
+            assert payload["model"] == model
+            assert payload["options"]["temperature"] == temperature
+            assert payload["options"]["num_predict"] == max_tokens
+
+    def test_ollama_client_model_parameters_property(
+        self, llm_config, model_parameters
+    ):
         """Test that model parameters are accessible as a property."""
-        client = OllamaClient(
-            config=llm_config,
-            model_parameters=model_parameters
-        )
+        client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
         # Test getting model parameters
         assert client.model_parameters == model_parameters
@@ -421,48 +498,78 @@ class TestOllamaClientComprehensive:
         client = OllamaClient(config=llm_config)
 
         # Should have inherited methods and properties
-        assert hasattr(client, '_create_completion')
-        assert hasattr(client, '_create_structured_completion')
-        assert hasattr(client, 'client')
+        assert hasattr(client, "_create_completion")
+        assert hasattr(client, "_create_structured_completion")
+        assert hasattr(client, "client")
 
     @pytest.mark.asyncio
-    async def test_create_completion_with_response_model(self, mock_openai_client, llm_config, model_parameters):
+    async def test_create_completion_with_response_model(
+        self, mock_openai_client, llm_config, model_parameters
+    ):
         """Test completion with response model parameter."""
         # Setup
-        expected_response = MagicMock()
-        mock_openai_client.chat.completions.create.return_value = expected_response
-
         client = OllamaClient(
             config=llm_config,
             client=mock_openai_client,
-            model_parameters=model_parameters
+            model_parameters=model_parameters,
         )
 
         # Test data
         model = "test_model"
-        messages = [{"role": "user", "content": "test message"}]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [{"role": "user", "content": "test message"}],
+        )
         temperature = 0.7
         max_tokens = 500
 
-        # Execute with response_model (should be ignored in regular completion)
-        result = await client._create_completion(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_model=MockResponseModel
-        )
+        # Mock httpx.AsyncClient since _create_completion makes direct HTTP calls
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
+            mock_response.status_code = 200
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
+            mock_response.json.return_value = {"response": "Test response"}
+            mock_client.post.return_value = mock_response
+            mock_client.__aenter__.return_value = mock_client
+            mock_client.__aexit__.return_value = None
+            mock_client_class.return_value = mock_client
 
-        # Verify
-        assert result == expected_response
-        mock_openai_client.chat.completions.create.assert_called_once_with(
-            model=model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            response_format={"type": "json_object"},
-            extra_body=model_parameters
-        )
+            # Execute with response_model (should be ignored in regular completion)
+            result = await client._create_completion(
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                response_model=MockResponseModel,
+            )
+
+            # Verify the result
+            assert result is not None
+            assert hasattr(result, "choices")
+            assert len(result.choices) == 1
+            assert result.choices[0].message.content == "Test response"
+            assert result.model == model
+
+            # Verify the HTTP call was made with correct parameters
+            # Note: response_model should be ignored in regular completion
+            mock_client.post.assert_called_once()
+            call_args = mock_client.post.call_args
+            assert call_args[0][0].endswith("/api/generate")
+            payload = call_args[1]["json"]
+            assert payload["model"] == model
+            # Verify base model parameters are included
+            assert payload["options"]["num_ctx"] == model_parameters["num_ctx"]
+            assert (
+                payload["options"]["repeat_penalty"]
+                == model_parameters["repeat_penalty"]
+            )
+            assert payload["options"]["top_k"] == model_parameters["top_k"]
+            assert payload["options"]["top_p"] == model_parameters["top_p"]
+            assert payload["options"]["seed"] == model_parameters["seed"]
+            # Verify parameter overrides work
+            assert payload["options"]["temperature"] == temperature
+            assert payload["options"]["num_predict"] == max_tokens
 
     def test_ollama_client_with_complex_model_parameters(self, llm_config):
         """Test OllamaClient with complex nested model parameters."""
@@ -475,16 +582,10 @@ class TestOllamaClientComprehensive:
             "temperature": 0.2,
             "seed": 42,
             "stop": ["Human:", "Assistant:"],
-            "nested_config": {
-                "sub_param": "value",
-                "sub_list": [1, 2, 3]
-            }
+            "nested_config": {"sub_param": "value", "sub_list": [1, 2, 3]},
         }
 
-        client = OllamaClient(
-            config=llm_config,
-            model_parameters=complex_parameters
-        )
+        client = OllamaClient(config=llm_config, model_parameters=complex_parameters)
 
         assert client.model_parameters == complex_parameters
         assert client.model_parameters["nested_config"]["sub_param"] == "value"
@@ -493,16 +594,16 @@ class TestOllamaClientComprehensive:
     @pytest.mark.asyncio
     async def test_native_api_create_completion(self, llm_config, model_parameters):
         """Test that create_completion uses native API with parameters."""
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             # Setup mock response
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
             mock_response.status_code = 200
-            mock_response.raise_for_status = AsyncMock()
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
             mock_response.json.return_value = {
                 "model": "test_model",
                 "response": "Test response from native API",
-                "done": True
+                "done": True,
             }
             mock_client.post.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
@@ -510,14 +611,14 @@ class TestOllamaClientComprehensive:
             mock_client_class.return_value = mock_client
 
             # Create client
-            client = OllamaClient(
-                config=llm_config,
-                model_parameters=model_parameters
-            )
+            client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
             # Test data
             model = "test_model"
-            messages = [{"role": "user", "content": "test message"}]
+            messages = cast(
+                list[ChatCompletionMessageParam],
+                [{"role": "user", "content": "test message"}],
+            )
             temperature = 0.7
             max_tokens = 500
 
@@ -526,7 +627,7 @@ class TestOllamaClientComprehensive:
                 model=model,
                 messages=messages,
                 temperature=temperature,
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
             )
 
             # Verify native API call was made
@@ -537,16 +638,25 @@ class TestOllamaClientComprehensive:
             assert call_args[0][0] == "http://localhost:11434/api/generate"
 
             # Check payload
-            payload = call_args[1]['json']
-            assert payload['model'] == "test_model"
-            assert payload['prompt'] == "User: test message"
-            assert payload['stream'] is False
-            assert payload['options'] == model_parameters
-            assert payload['options']['temperature'] == 0.7
-            assert payload['options']['num_predict'] == 500
+            payload = call_args[1]["json"]
+            assert payload["model"] == "test_model"
+            assert payload["prompt"] == "User: test message"
+            assert payload["stream"] is False
+            # Verify base model parameters are included
+            assert payload["options"]["num_ctx"] == model_parameters["num_ctx"]
+            assert (
+                payload["options"]["repeat_penalty"]
+                == model_parameters["repeat_penalty"]
+            )
+            assert payload["options"]["top_k"] == model_parameters["top_k"]
+            assert payload["options"]["top_p"] == model_parameters["top_p"]
+            assert payload["options"]["seed"] == model_parameters["seed"]
+            # Verify parameter overrides work
+            assert payload["options"]["temperature"] == 0.7
+            assert payload["options"]["num_predict"] == 500
 
             # Check response format conversion
-            assert hasattr(result, 'choices')
+            assert hasattr(result, "choices")
             assert len(result.choices) == 1
             assert result.choices[0].message.content == "Test response from native API"
             assert result.choices[0].message.role == "assistant"
@@ -557,12 +667,15 @@ class TestOllamaClientComprehensive:
         client = OllamaClient(config=llm_config)
 
         # Test various message types
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant"},
-            {"role": "user", "content": "Hello, how are you?"},
-            {"role": "assistant", "content": "I'm doing well, thank you!"},
-            {"role": "user", "content": "What's the weather like?"}
-        ]
+        messages = cast(
+            list[ChatCompletionMessageParam],
+            [
+                {"role": "system", "content": "You are a helpful assistant"},
+                {"role": "user", "content": "Hello, how are you?"},
+                {"role": "assistant", "content": "I'm doing well, thank you!"},
+                {"role": "user", "content": "What's the weather like?"},
+            ],
+        )
 
         prompt = client._messages_to_prompt(messages)
         expected = (
@@ -579,32 +692,30 @@ class TestOllamaClientComprehensive:
         """Test that base URL is correctly converted from OpenAI-compatible to native."""
         # Test with /v1 suffix
         config_with_v1 = LLMConfig(
-            api_key="test_key",
-            model="test_model",
-            base_url="http://localhost:11434/v1"
+            api_key="test_key", model="test_model", base_url="http://localhost:11434/v1"
         )
 
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
             mock_response.status_code = 200
-            mock_response.raise_for_status = AsyncMock()
-            mock_response.json.return_value = {"model": "test", "response": "test", "done": True}
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
+            mock_response.json.return_value = {
+                "model": "test",
+                "response": "test",
+                "done": True,
+            }
             mock_client.post.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
             client = OllamaClient(
-                config=config_with_v1,
-                model_parameters=model_parameters
+                config=config_with_v1, model_parameters=model_parameters
             )
 
             await client._create_completion(
-                "test_model",
-                [{"role": "user", "content": "test"}],
-                0.5,
-                100
+                "test_model", [{"role": "user", "content": "test"}], 0.5, 100
             )
 
             # Verify the URL was converted correctly
@@ -616,20 +727,19 @@ class TestOllamaClientComprehensive:
         """Test that keep_alive parameter is included in _create_completion payload."""
         model_parameters_with_keep_alive = {
             "num_ctx": 8192,
-            "keep_alive": 300  # 5 minutes in seconds
+            "keep_alive": 300,  # 5 minutes in seconds
         }
 
         client = OllamaClient(
-            config=llm_config,
-            model_parameters=model_parameters_with_keep_alive
+            config=llm_config, model_parameters=model_parameters_with_keep_alive
         )
 
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             # Setup mock
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
             mock_response.status_code = 200
-            mock_response.raise_for_status = AsyncMock()
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
             mock_response.json.return_value = {"response": "Test completion response"}
             mock_client.post.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
@@ -637,45 +747,41 @@ class TestOllamaClientComprehensive:
             mock_client_class.return_value = mock_client
 
             # Test completion
-            messages = [{"role": "user", "content": "Test message"}]
-            result = await client._create_completion(
-                model="test-model",
-                messages=messages,
-                temperature=0.5,
-                max_tokens=100
+            messages = cast(
+                list[ChatCompletionMessageParam],
+                [{"role": "user", "content": "Test message"}],
+            )
+            await client._create_completion(
+                model="test-model", messages=messages, temperature=0.5, max_tokens=100
             )
 
             # Verify the API call
             assert mock_client.post.called
             call_args = mock_client.post.call_args_list[0]
-            payload = call_args[1]['json']
+            payload = call_args[1]["json"]
 
             # Verify keep_alive is in the payload
-            assert 'keep_alive' in payload
-            assert payload['keep_alive'] == 300
-            assert payload['options']['num_ctx'] == 8192
-            assert payload['options']['temperature'] == 0.5
-            assert payload['options']['num_predict'] == 100
+            assert "keep_alive" in payload
+            assert payload["keep_alive"] == 300
+            assert payload["options"]["num_ctx"] == 8192
+            assert payload["options"]["temperature"] == 0.5
+            assert payload["options"]["num_predict"] == 100
 
     @pytest.mark.asyncio
     async def test_no_keep_alive_parameter_handling(self, llm_config):
         """Test that payload doesn't include keep_alive when not in model_parameters."""
-        model_parameters_without_keep_alive = {
-            "num_ctx": 4096,
-            "temperature": 0.7
-        }
+        model_parameters_without_keep_alive = {"num_ctx": 4096, "temperature": 0.7}
 
         client = OllamaClient(
-            config=llm_config,
-            model_parameters=model_parameters_without_keep_alive
+            config=llm_config, model_parameters=model_parameters_without_keep_alive
         )
 
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             # Setup mock
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
             mock_response.status_code = 200
-            mock_response.raise_for_status = AsyncMock()
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
             mock_response.json.return_value = {"response": "Test response"}
             mock_client.post.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
@@ -683,49 +789,43 @@ class TestOllamaClientComprehensive:
             mock_client_class.return_value = mock_client
 
             # Test completion
-            messages = [{"role": "user", "content": "Test message"}]
+            messages = cast(
+                list[ChatCompletionMessageParam],
+                [{"role": "user", "content": "Test message"}],
+            )
             await client._create_completion(
-                model="test-model",
-                messages=messages,
-                temperature=0.5,
-                max_tokens=100
+                model="test-model", messages=messages, temperature=0.5, max_tokens=100
             )
 
             # Verify the API call
             assert mock_client.post.called
-            payload = mock_client.post.call_args[1]['json']
+            payload = mock_client.post.call_args[1]["json"]
 
             # Verify keep_alive is NOT in the payload
-            assert 'keep_alive' not in payload
-            assert payload['options']['num_ctx'] == 4096
+            assert "keep_alive" not in payload
+            assert payload["options"]["num_ctx"] == 4096
 
     @pytest.mark.asyncio
     async def test_keep_alive_parameter_edge_cases(self, llm_config):
         """Test keep_alive parameter with various value formats."""
         test_cases = [
-            ("5m", "5m"),           # String duration
-            (300, 300),             # Integer seconds
-            ("0", "0"),             # Zero (unload immediately)
-            ("-1", "-1"),           # Keep forever
+            ("5m", "5m"),  # String duration
+            (300, 300),  # Integer seconds
+            ("0", "0"),  # Zero (unload immediately)
+            ("-1", "-1"),  # Keep forever
         ]
 
         for keep_alive_input, expected_output in test_cases:
-            model_parameters = {
-                "num_ctx": 2048,
-                "keep_alive": keep_alive_input
-            }
+            model_parameters = {"num_ctx": 2048, "keep_alive": keep_alive_input}
 
-            client = OllamaClient(
-                config=llm_config,
-                model_parameters=model_parameters
-            )
+            client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
-            with patch('httpx.AsyncClient') as mock_client_class:
+            with patch("httpx.AsyncClient") as mock_client_class:
                 # Setup mock
                 mock_client = AsyncMock()
-                mock_response = AsyncMock()
+                mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
                 mock_response.status_code = 200
-                mock_response.raise_for_status = AsyncMock()
+                mock_response.raise_for_status = MagicMock()  # Synchronous method
                 mock_response.json.return_value = {"response": "Test response"}
                 mock_client.post.return_value = mock_response
                 mock_client.__aenter__.return_value = mock_client
@@ -733,18 +833,21 @@ class TestOllamaClientComprehensive:
                 mock_client_class.return_value = mock_client
 
                 # Test completion
-                messages = [{"role": "user", "content": "Test message"}]
+                messages = cast(
+                    list[ChatCompletionMessageParam],
+                    [{"role": "user", "content": "Test message"}],
+                )
                 await client._create_completion(
                     model="test-model",
                     messages=messages,
                     temperature=0.5,
-                    max_tokens=50
+                    max_tokens=50,
                 )
 
                 # Verify the keep_alive value
-                payload = mock_client.post.call_args[1]['json']
-                assert 'keep_alive' in payload
-                assert payload['keep_alive'] == expected_output
+                payload = mock_client.post.call_args[1]["json"]
+                assert "keep_alive" in payload
+                assert payload["keep_alive"] == expected_output
 
     @pytest.mark.asyncio
     async def test_context_parameter_preservation(self, llm_config):
@@ -754,47 +857,47 @@ class TestOllamaClientComprehensive:
             "num_threads": 40,
             "repeat_penalty": 1.1,
             "top_k": 50,
-            "top_p": 0.9
+            "top_p": 0.9,
         }
 
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = AsyncMock()
-            mock_response = AsyncMock()
+            mock_response = MagicMock()  # Use MagicMock for response, not AsyncMock
             mock_response.status_code = 200
-            mock_response.raise_for_status = AsyncMock()
-            mock_response.json.return_value = {"model": "test", "response": "test", "done": True}
+            mock_response.raise_for_status = MagicMock()  # Synchronous method
+            mock_response.json.return_value = {
+                "model": "test",
+                "response": "test",
+                "done": True,
+            }
             mock_client.post.return_value = mock_response
             mock_client.__aenter__.return_value = mock_client
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
             client = OllamaClient(
-                config=llm_config,
-                model_parameters=context_parameters
+                config=llm_config, model_parameters=context_parameters
             )
 
             await client._create_completion(
-                "gpt-oss:latest",
-                [{"role": "user", "content": "Hello"}],
-                0.1,
-                100
+                "gpt-oss:latest", [{"role": "user", "content": "Hello"}], 0.1, 100
             )
 
             # Verify all context parameters were sent
             call_args = mock_client.post.call_args
-            payload = call_args[1]['json']
-            options = payload['options']
+            payload = call_args[1]["json"]
+            options = payload["options"]
 
-            assert options['num_ctx'] == 12000
-            assert options['num_threads'] == 40
-            assert options['repeat_penalty'] == 1.1
-            assert options['top_k'] == 50
-            assert options['top_p'] == 0.9
+            assert options["num_ctx"] == 12000
+            assert options["num_threads"] == 40
+            assert options["repeat_penalty"] == 1.1
+            assert options["top_k"] == 50
+            assert options["top_p"] == 0.9
 
     @pytest.mark.asyncio
     async def test_native_api_error_handling(self, llm_config, model_parameters):
         """Test error handling in native API calls."""
-        with patch('httpx.AsyncClient') as mock_client_class:
+        with patch("httpx.AsyncClient") as mock_client_class:
             # Setup mock to raise exception
             mock_client = AsyncMock()
             mock_client.post.side_effect = httpx.RequestError("Connection failed")
@@ -802,16 +905,10 @@ class TestOllamaClientComprehensive:
             mock_client.__aexit__.return_value = None
             mock_client_class.return_value = mock_client
 
-            client = OllamaClient(
-                config=llm_config,
-                model_parameters=model_parameters
-            )
+            client = OllamaClient(config=llm_config, model_parameters=model_parameters)
 
             # The method should raise the exception (not handle it silently)
             with pytest.raises(httpx.RequestError):
                 await client._create_completion(
-                    "test_model",
-                    [{"role": "user", "content": "test"}],
-                    0.5,
-                    100
+                    "test_model", [{"role": "user", "content": "test"}], 0.5, 100
                 )

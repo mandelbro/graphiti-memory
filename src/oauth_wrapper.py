@@ -23,10 +23,12 @@ app = FastAPI(title="Graphiti MCP OAuth Server")
 
 # OAuth configuration
 OAUTH_CONFIG = {
-    "client_id": os.environ.get('OAUTH_CLIENT_ID', 'graphiti-mcp'),
-    "client_secret": os.environ.get('OAUTH_CLIENT_SECRET', 'graphiti-secret-key-change-this-in-production'),
-    "issuer": os.environ.get('OAUTH_ISSUER', 'http://localhost:8020'),
-    "audience": os.environ.get('OAUTH_AUDIENCE', 'graphiti-mcp'),
+    "client_id": os.environ.get("OAUTH_CLIENT_ID", "graphiti-mcp"),
+    "client_secret": os.environ.get(
+        "OAUTH_CLIENT_SECRET", "graphiti-secret-key-change-this-in-production"
+    ),
+    "issuer": os.environ.get("OAUTH_ISSUER", "http://localhost:8020"),
+    "audience": os.environ.get("OAUTH_AUDIENCE", "graphiti-mcp"),
 }
 
 # Store registered clients (in production, use a database)
@@ -74,6 +76,7 @@ async def register_client(request: Request):
 
         # Generate client credentials
         import secrets
+
         client_id = f"client_{secrets.token_urlsafe(16)}"
         client_secret = secrets.token_urlsafe(32)
 
@@ -84,7 +87,7 @@ async def register_client(request: Request):
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
             "token_endpoint_auth_method": "none",
-            **body
+            **body,
         }
 
         # Store client info
@@ -102,54 +105,68 @@ async def register_client(request: Request):
 @app.post("/sse")
 async def proxy_sse(request: Request):
     """Proxy SSE requests to the MCP server running on a different port"""
-    mcp_port = int(os.environ.get('MCP_INTERNAL_PORT', '2401'))
+    mcp_port = int(os.environ.get("MCP_INTERNAL_PORT", "2401"))
     mcp_url = f"http://localhost:{mcp_port}/sse"
 
     # Forward the request headers
     headers = dict(request.headers)
-    headers.pop('host', None)  # Remove host header
+    headers.pop("host", None)  # Remove host header
 
     if request.method == "GET":
         # Handle SSE streaming
         # Stream the response without buffering
         async def generate():
-            # Create httpx client inside the generator to ensure it stays alive
-            # Configure timeout for SSE connections (no read timeout for streaming)
-            timeout = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                async with client.stream("GET", mcp_url, headers=headers, params=request.query_params) as response:
-                    async for chunk in response.aiter_bytes():
-                        yield chunk
+            try:
+                # Create httpx client inside the generator to ensure it stays alive
+                # Configure timeout for SSE connections (no read timeout for streaming)
+                timeout = httpx.Timeout(connect=10.0, read=None, write=10.0, pool=10.0)
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    async with client.stream(
+                        "GET", mcp_url, headers=headers, params=request.query_params
+                    ) as response:
+                        async for chunk in response.aiter_bytes():
+                            yield chunk
+            except (
+                httpx.ConnectError,
+                httpx.ReadTimeout,
+                httpx.TimeoutException,
+                Exception,
+            ) as e:
+                logger.error(f"Error in SSE streaming: {e}")
+                # Yield an SSE error event
+                yield b"event: error\ndata: Internal server error\n\n"
 
         # Ensure proper SSE headers
         sse_headers = {
-            "Content-Type": "text/event-stream",
+            "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         }
 
         return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers=sse_headers
+            generate(), media_type="text/event-stream", headers=sse_headers
         )
     else:
         # Handle POST requests
-        timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            body = await request.body()
-            response = await client.post(
-                mcp_url,
-                headers=headers,
-                content=body,
-                follow_redirects=True
-            )
+        try:
+            timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                body = await request.body()
+                response = await client.post(
+                    mcp_url, headers=headers, content=body, follow_redirects=True
+                )
 
-            return Response(
-                content=response.content,
-                status_code=response.status_code,
-                headers=dict(response.headers)
+                return Response(
+                    content=response.content,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                )
+        except (httpx.ConnectError, httpx.ReadTimeout, httpx.TimeoutException) as e:
+            logger.error(f"Error in SSE POST request: {e}")
+            return JSONResponse(
+                {"error": "internal_server_error", "message": "MCP server unavailable"},
+                status_code=500,
             )
 
 
@@ -157,29 +174,36 @@ async def proxy_sse(request: Request):
 @app.post("/messages/")
 async def proxy_messages(request: Request):
     """Proxy messages requests to the MCP server running on a different port"""
-    mcp_port = int(os.environ.get('MCP_INTERNAL_PORT', '2401'))
+    mcp_port = int(os.environ.get("MCP_INTERNAL_PORT", "2401"))
     mcp_url = f"http://localhost:{mcp_port}/messages/"
 
     # Forward the request headers
     headers = dict(request.headers)
-    headers.pop('host', None)  # Remove host header
+    headers.pop("host", None)  # Remove host header
 
     # Handle POST requests
-    timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        body = await request.body()
-        response = await client.post(
-            mcp_url,
-            headers=headers,
-            content=body,
-            params=request.query_params,
-            follow_redirects=True
-        )
+    try:
+        timeout = httpx.Timeout(connect=10.0, read=30.0, write=10.0, pool=10.0)
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            body = await request.body()
+            response = await client.post(
+                mcp_url,
+                headers=headers,
+                content=body,
+                params=request.query_params,
+                follow_redirects=True,
+            )
 
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=dict(response.headers)
+            return Response(
+                content=response.content,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+            )
+    except (httpx.ConnectError, httpx.ReadTimeout, httpx.TimeoutException) as e:
+        logger.error(f"Error in messages proxy: {e}")
+        return JSONResponse(
+            {"error": "internal_server_error", "message": "MCP server unavailable"},
+            status_code=500,
         )
 
 
@@ -190,6 +214,6 @@ async def root():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get('MCP_SERVER_PORT', '8020'))
+    port = int(os.environ.get("MCP_SERVER_PORT", "8020"))
     logger.info(f"Starting OAuth wrapper on port {port}")
     uvicorn.run(app, host="0.0.0.0", port=port)

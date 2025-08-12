@@ -8,15 +8,14 @@ like num_ctx, top_p, etc. to the Ollama API. It uses a hybrid approach:
 """
 
 import typing
-from typing import Dict, Any
-import httpx
+from typing import Any
 
+import httpx
+from graphiti_core.llm_client.config import DEFAULT_MAX_TOKENS, LLMConfig
+from graphiti_core.llm_client.openai_base_client import BaseOpenAIClient
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 from pydantic import BaseModel
-
-from graphiti_core.llm_client.config import DEFAULT_MAX_TOKENS, LLMConfig
-from graphiti_core.llm_client.openai_base_client import BaseOpenAIClient
 
 
 class OllamaClient(BaseOpenAIClient):
@@ -33,7 +32,7 @@ class OllamaClient(BaseOpenAIClient):
         cache: bool = False,
         client: typing.Any = None,
         max_tokens: int = DEFAULT_MAX_TOKENS,
-        model_parameters: Dict[str, Any] | None = None,
+        model_parameters: dict[str, Any] | None = None,
     ):
         """
         Initialize the OllamaClient with the provided configuration and model parameters.
@@ -96,14 +95,15 @@ class OllamaClient(BaseOpenAIClient):
         prompt = self._messages_to_prompt(messages)
 
         # Use native Ollama API with parameters
-        native_url = self.ollama_base_url.replace("/v1", "")
+        base_url = self.ollama_base_url or "http://localhost:11434"
+        native_url = base_url.replace("/v1", "").rstrip("/")
         api_url = f"{native_url}/api/generate"
 
         payload = {
             "model": model,
             "prompt": prompt,
             "stream": False,
-            "options": self.model_parameters if self.model_parameters else {}
+            "options": self.model_parameters.copy() if self.model_parameters else {},
         }
 
         # Add keep_alive if specified in model_parameters
@@ -156,6 +156,19 @@ class OllamaClient(BaseOpenAIClient):
                 self.role = "assistant"
                 self.parsed = None  # Ollama doesn't support structured output
                 self.refusal = None  # Ollama doesn't have refusal mechanism
+
+            def model_dump(self) -> dict[str, Any]:
+                """Return dict representation compatible with Pydantic model_dump()."""
+                return {
+                    "content": self.content,
+                    "role": self.role,
+                    "parsed": self.parsed,
+                    "refusal": self.refusal,
+                    "annotations": None,
+                    "audio": None,
+                    "function_call": None,
+                    "tool_calls": None,
+                }
 
         class MockResponse:
             def __init__(self, content: str, model: str):

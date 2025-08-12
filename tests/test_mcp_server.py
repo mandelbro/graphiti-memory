@@ -16,13 +16,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 @pytest.fixture(autouse=True)
 def setup_environment():
     """Set up environment variables for testing."""
-    os.environ['USE_OLLAMA'] = 'true'
-    os.environ['OLLAMA_BASE_URL'] = 'http://localhost:11434/v1'
-    os.environ['OLLAMA_LLM_MODEL'] = 'deepseek-r1:7b'
-    os.environ['OLLAMA_EMBEDDING_MODEL'] = 'nomic-embed-text'
-    os.environ['NEO4J_URI'] = 'bolt://localhost:7687'
-    os.environ['NEO4J_USER'] = 'neo4j'
-    os.environ['NEO4J_PASSWORD'] = 'password'
+    os.environ["USE_OLLAMA"] = "true"
+    os.environ["OLLAMA_BASE_URL"] = "http://localhost:11434/v1"
+    os.environ["OLLAMA_LLM_MODEL"] = "deepseek-r1:7b"
+    os.environ["OLLAMA_EMBEDDING_MODEL"] = "nomic-embed-text"
+    os.environ["NEO4J_URI"] = "bolt://localhost:7687"
+    os.environ["NEO4J_USER"] = "neo4j"
+    os.environ["NEO4J_PASSWORD"] = "password"
 
 
 class TestMCPServerInitialization:
@@ -30,30 +30,30 @@ class TestMCPServerInitialization:
 
     def test_mcp_server_import(self):
         """Test that the MCP server module can be imported."""
-        from graphiti_mcp_server import mcp
+        from src.graphiti_mcp_server import mcp
 
         assert mcp is not None
-        assert hasattr(mcp, 'tool')
-        assert hasattr(mcp, 'resource')
+        assert hasattr(mcp, "tool")
+        assert hasattr(mcp, "resource")
 
     def test_mcp_server_configuration(self):
         """Test MCP server configuration."""
-        from graphiti_mcp_server import mcp
+        from src.graphiti_mcp_server import mcp
 
         # Check that the server has the expected configuration
-        assert hasattr(mcp, 'settings')
-        assert hasattr(mcp.settings, 'port')
+        assert hasattr(mcp, "settings")
+        assert hasattr(mcp.settings, "port")
         assert mcp.settings.port == 8020  # Default port
 
     def test_mcp_server_instructions(self):
         """Test that MCP server has proper instructions."""
-        from graphiti_mcp_server import mcp
+        from src.graphiti_mcp_server import mcp
 
         # Check that instructions are set
-        assert hasattr(mcp, 'instructions')
+        assert hasattr(mcp, "instructions")
         assert mcp.instructions is not None
         assert len(mcp.instructions) > 0
-        assert 'Graphiti' in mcp.instructions
+        assert "Graphiti" in mcp.instructions
 
 
 class TestMCPServerTools:
@@ -61,22 +61,21 @@ class TestMCPServerTools:
 
     def test_tool_registration(self):
         """Test that all expected tools are registered."""
-        from graphiti_mcp_server import mcp
 
         # Check that the server has tools registered
         # Note: We can't directly access the tools due to FastMCP implementation,
         # but we can verify the tool decorators are working by checking if functions exist
 
         # Import all tool functions to verify they exist
-        from graphiti_mcp_server import (
-            search_memory_nodes,
-            search_memory_facts,
+        from src.graphiti_mcp_server import (
             add_memory,
-            get_episodes,
+            clear_graph,
             delete_entity_edge,
             delete_episode,
             get_entity_edge,
-            clear_graph
+            get_episodes,
+            search_memory_facts,
+            search_memory_nodes,
         )
 
         # Verify all functions exist and are callable
@@ -91,15 +90,15 @@ class TestMCPServerTools:
 
     def test_tool_decorators(self):
         """Test that tool decorators are properly applied."""
-        from graphiti_mcp_server import (
-            search_memory_nodes,
-            search_memory_facts,
+        from src.graphiti_mcp_server import (
             add_memory,
-            get_episodes,
+            clear_graph,
             delete_entity_edge,
             delete_episode,
             get_entity_edge,
-            clear_graph
+            get_episodes,
+            search_memory_facts,
+            search_memory_nodes,
         )
 
         # Check that functions have the expected attributes from the @mcp.tool() decorator
@@ -112,21 +111,21 @@ class TestMCPServerTools:
             delete_entity_edge,
             delete_episode,
             get_entity_edge,
-            clear_graph
+            clear_graph,
         ]
 
         for tool in tools:
-            assert hasattr(tool, '__name__')
-            assert hasattr(tool, '__annotations__')
+            assert hasattr(tool, "__name__")
+            assert hasattr(tool, "__annotations__")
             assert tool.__name__ in [
-                'search_memory_nodes',
-                'search_memory_facts',
-                'add_memory',
-                'get_episodes',
-                'delete_entity_edge',
-                'delete_episode',
-                'get_entity_edge',
-                'clear_graph'
+                "search_memory_nodes",
+                "search_memory_facts",
+                "add_memory",
+                "get_episodes",
+                "delete_entity_edge",
+                "delete_episode",
+                "get_entity_edge",
+                "clear_graph",
             ]
 
 
@@ -135,47 +134,47 @@ class TestMCPServerConfiguration:
 
     def test_graphiti_config_import(self):
         """Test that GraphitiConfig can be imported and instantiated."""
-        from graphiti_mcp_server import GraphitiConfig
+        from src.graphiti_mcp_server import GraphitiConfig
 
         # Test that the class can be instantiated
         config = GraphitiConfig()
         assert config is not None
-        assert hasattr(config, 'llm')
-        assert hasattr(config, 'embedder')
-        assert hasattr(config, 'neo4j')
+        assert hasattr(config, "llm")
+        assert hasattr(config, "embedder")
+        assert hasattr(config, "neo4j")
 
     def test_llm_config_import(self):
         """Test that GraphitiLLMConfig can be imported and instantiated."""
-        from graphiti_mcp_server import GraphitiLLMConfig
+        from src.graphiti_mcp_server import GraphitiLLMConfig
 
         # Test that the class can be instantiated
         config = GraphitiLLMConfig()
         assert config is not None
-        assert hasattr(config, 'model')
-        assert hasattr(config, 'use_ollama')
-        assert hasattr(config, 'ollama_base_url')
+        assert hasattr(config, "model")
+        assert hasattr(config, "use_ollama")
+        assert hasattr(config, "ollama_base_url")
 
     def test_embedder_config_import(self):
         """Test that GraphitiEmbedderConfig can be imported and instantiated."""
-        from graphiti_mcp_server import GraphitiEmbedderConfig
+        from src.graphiti_mcp_server import GraphitiEmbedderConfig
 
         # Test that the class can be instantiated
         config = GraphitiEmbedderConfig()
         assert config is not None
-        assert hasattr(config, 'model')
-        assert hasattr(config, 'use_ollama')
-        assert hasattr(config, 'ollama_base_url')
+        assert hasattr(config, "model")
+        assert hasattr(config, "use_ollama")
+        assert hasattr(config, "ollama_base_url")
 
     def test_neo4j_config_import(self):
         """Test that Neo4jConfig can be imported and instantiated."""
-        from graphiti_mcp_server import Neo4jConfig
+        from src.graphiti_mcp_server import Neo4jConfig
 
         # Test that the class can be instantiated
         config = Neo4jConfig()
         assert config is not None
-        assert hasattr(config, 'uri')
-        assert hasattr(config, 'user')
-        assert hasattr(config, 'password')
+        assert hasattr(config, "uri")
+        assert hasattr(config, "user")
+        assert hasattr(config, "password")
 
 
 class TestMCPServerTypes:
@@ -183,56 +182,54 @@ class TestMCPServerTypes:
 
     def test_response_types(self):
         """Test that response types are properly defined."""
-        from graphiti_mcp_server import (
-            ErrorResponse, SuccessResponse, NodeSearchResponse,
-            FactSearchResponse, EpisodeSearchResponse, StatusResponse
+        from src.graphiti_mcp_server import (
+            EpisodeSearchResponse,
+            ErrorResponse,
+            FactSearchResponse,
+            NodeSearchResponse,
+            StatusResponse,
+            SuccessResponse,
         )
 
         # Test that all response types can be instantiated
         error_response = ErrorResponse(error="test error")
-        assert error_response['error'] == "test error"
+        assert error_response.error == "test error"
 
         success_response = SuccessResponse(message="test message")
-        assert success_response['message'] == "test message"
+        assert success_response.message == "test message"
 
         node_search_response = NodeSearchResponse(message="test", nodes=[])
-        assert node_search_response['message'] == "test"
-        assert node_search_response['nodes'] == []
+        assert node_search_response.message == "test"
+        assert node_search_response.nodes == []
 
         fact_search_response = FactSearchResponse(message="test", facts=[])
-        assert fact_search_response['message'] == "test"
-        assert fact_search_response['facts'] == []
+        assert fact_search_response.message == "test"
+        assert fact_search_response.facts == []
 
         episode_search_response = EpisodeSearchResponse(message="test", episodes=[])
-        assert episode_search_response['message'] == "test"
-        assert episode_search_response['episodes'] == []
+        assert episode_search_response.message == "test"
+        assert episode_search_response.episodes == []
 
         status_response = StatusResponse(status="ok", message="test")
-        assert status_response['status'] == "ok"
-        assert status_response['message'] == "test"
+        assert status_response.status == "ok"
+        assert status_response.message == "test"
 
     def test_entity_types(self):
         """Test that entity types are properly defined."""
-        from graphiti_mcp_server import Requirement, Preference, Procedure
+        from src.graphiti_mcp_server import Preference, Procedure, Requirement
 
         # Test that entity types can be instantiated
         requirement = Requirement(
-            project_name="test project",
-            description="test requirement"
+            project_name="test project", description="test requirement"
         )
         assert requirement.project_name == "test project"
         assert requirement.description == "test requirement"
 
-        preference = Preference(
-            category="test category",
-            description="test preference"
-        )
+        preference = Preference(category="test category", description="test preference")
         assert preference.category == "test category"
         assert preference.description == "test preference"
 
-        procedure = Procedure(
-            description="test procedure"
-        )
+        procedure = Procedure(description="test procedure")
         assert procedure.description == "test procedure"
 
 

@@ -3,14 +3,13 @@
 
 import os
 import sys
-from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
 
 # Import the OAuth wrapper app
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
-from oauth_wrapper import app
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from src.oauth_wrapper import app
 
 
 class TestOAuthRoutes:
@@ -51,7 +50,7 @@ class TestOAuthRoutes:
         """Test register endpoint is accessible."""
         client_data = {
             "client_name": "Test Client",
-            "redirect_uris": ["http://localhost:3000/callback"]
+            "redirect_uris": ["http://localhost:3000/callback"],
         }
         response = client.post("/register", json=client_data)
         assert response.status_code == 201
