@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.scripts]
-montesmakes.graphiti-memory = "src.graphiti_mcp_server:main"
+montesmakes-graphiti-memory = "src.graphiti_mcp_server:main"
 
 [project.urls]
 Homepage = "https://github.com/mandelbro/graphiti-memory"
