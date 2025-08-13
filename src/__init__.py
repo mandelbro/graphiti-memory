@@ -5,7 +5,7 @@ This package provides a Model Context Protocol (MCP) server that exposes
 Graphiti's temporal knowledge graph capabilities to AI agents and assistants.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 __author__ = "Made by Montes"
 __email__ = "chris@montesmakes.co"
 
