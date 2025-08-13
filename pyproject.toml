@@ -26,13 +26,13 @@ dependencies = [
     "openai>=1.99.9",
     "graphiti-core>=0.18.5",
     "azure-identity>=1.24.0",
-    "starlette>=0.37.0",
-    "uvicorn>=0.29.0",
-    "fastapi>=0.109.0",
-    "httpx>=0.27.0",
+    "starlette>=0.47.2",
+    "uvicorn>=0.35.0",
+    "fastapi>=0.116.1",
+    "httpx>=0.28.1",
     "aiohttp>=3.12.15",
     "pyyaml>=6.0.1",
-    "python-dotenv>=1.0.0",
+    "python-dotenv>=1.1.1",
 ]
 
 [project.scripts]
@@ -47,14 +47,14 @@ Issues = "https://github.com/mandelbro/graphiti-memory/issues"
 
 [project.optional-dependencies]
 dev = [
-    "ruff>=0.3.0",
+    "ruff>=0.12.8",
     "pyright>=1.1.0",
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.24.0",
+    "pytest>=8.4.1",
+    "pytest-asyncio>=1.1.0",
     "pytest-mock>=3.14.0",
-    "pytest-cov>=5.0.0",
-    "black>=24.0.0",
-    "mypy>=1.12.0",
+    "pytest-cov>=6.2.1",
+    "black>=25.1.0",
+    "mypy>=1.17.1",
     "twine>=6.1.0",
 ]
 
