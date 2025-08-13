@@ -69,6 +69,23 @@ async def initialize_graphiti(
 
         embedder_client = config.embedder.create_client()
 
+        # Create a dummy cross encoder to avoid OpenAI dependency
+        from graphiti_core.cross_encoder.client import CrossEncoderClient
+        from typing import List, Tuple
+
+        class DummyCrossEncoder(CrossEncoderClient):
+            """A dummy cross encoder that returns documents in original order."""
+
+            async def rank(
+                self,
+                query: str,
+                documents: List[str],
+            ) -> List[Tuple[str, float]]:
+                # Return documents in original order with dummy scores
+                return [(doc, 1.0 - i * 0.01) for i, doc in enumerate(documents)]
+
+        dummy_cross_encoder = DummyCrossEncoder()
+
         # Initialize Graphiti client
         graphiti_client = Graphiti(
             uri=config.neo4j.uri,
@@ -76,6 +93,7 @@ async def initialize_graphiti(
             password=config.neo4j.password,
             llm_client=llm_client,
             embedder=embedder_client,
+            cross_encoder=dummy_cross_encoder,  # Use dummy cross encoder instead of OpenAI
             max_coroutines=SEMAPHORE_LIMIT,
         )
 
