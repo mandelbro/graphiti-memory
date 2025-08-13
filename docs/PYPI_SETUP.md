@@ -23,14 +23,14 @@ We use **trusted publishing** which is the modern, secure way to publish to PyPI
 2. **Go to your PyPI account settings**: https://pypi.org/manage/account/
 3. **Navigate to "Trusted publishers"** section
 4. **Add a new trusted publisher** with these details:
-   - **Repository owner**: `getzep` (or your GitHub username/org)
+   - **Repository owner**: `mandelbro` (or your GitHub username/org)
    - **Repository name**: `graphiti-memory` (or your repo name)
    - **Workflow name**: `ci-cd.yml`
    - **Environment name**: `pypi`
 
 #### For Existing Packages
 
-1. Go to your project page on PyPI: https://pypi.org/project/graphiti-mcp-server/
+1. Go to your project page on PyPI: https://pypi.org/project/montesmakes.graphiti-memory/
 2. Go to **Settings** → **Trusted Publishers**
 3. **Add a trusted publisher** with the same details as above
 
@@ -40,7 +40,7 @@ For testing releases before publishing to the main PyPI:
 
 1. **Create a TestPyPI account** at https://test.pypi.org
 2. **Add trusted publisher** for TestPyPI:
-   - Repository owner: `getzep`
+   - Repository owner: `mandelbro`
    - Repository name: `graphiti-memory`
    - Workflow name: `ci-cd.yml`
    - Environment name: `testpypi`
@@ -79,10 +79,10 @@ Our CI/CD workflow (`.github/workflows/ci-cd.yml`) includes:
 ### For Development/Testing (TestPyPI)
 
 1. **Push to `main` branch** - Automatically triggers TestPyPI publishing
-2. **Check TestPyPI**: https://test.pypi.org/project/graphiti-mcp-server/
+2. **Check TestPyPI**: https://test.pypi.org/project/montesmakes.graphiti-memory/
 3. **Test installation**:
    ```bash
-   uvx --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ graphiti-mcp-server
+   uvx --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ montesmakes.graphiti-memory
    ```
 
 ### For Production Releases (PyPI)
@@ -99,8 +99,8 @@ Our CI/CD workflow (`.github/workflows/ci-cd.yml`) includes:
    - Creates signed attestations
 
 3. **Verify publication**:
-   - Check PyPI: https://pypi.org/project/graphiti-mcp-server/
-   - Test installation: `uvx graphiti-mcp-server`
+   - Check PyPI: https://pypi.org/project/montesmakes.graphiti-memory/
+   - Test installation: `uvx montesmakes.graphiti-memory`
 
 ## Version Management
 
@@ -110,7 +110,7 @@ Update the version in `pyproject.toml` before creating releases:
 
 ```toml
 [project]
-name = "graphiti-mcp-server"
+name = "montesmakes.graphiti-memory"
 version = "0.5.0"  # Update this
 ```
 
@@ -155,7 +155,7 @@ Use the **Manual Package Test** workflow:
 
 - **PyPI Trusted Publishing Docs**: https://docs.pypi.org/trusted-publishers/
 - **GitHub OIDC Docs**: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
-- **Package Issues**: https://github.com/getzep/graphiti/issues
+- **Package Issues**: https://github.com/mandelbro/graphiti-memory/issues
 
 ## Security Best Practices
 
@@ -177,9 +177,9 @@ Your package will then be available for installation with:
 
 ```bash
 # Direct installation and run
-uvx graphiti-mcp-server
+uvx montesmakes.graphiti-memory
 
 # Or install globally
-uv tool install graphiti-mcp-server
-graphiti-mcp-server --help
+uv tool install montesmakes.graphiti-memory
+montesmakes.graphiti-memory --help
 ```

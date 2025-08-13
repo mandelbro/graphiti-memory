@@ -14,16 +14,16 @@ You can run the Graphiti MCP Server directly without installation:
 
 ```bash
 # Run with default settings
-uvx graphiti-mcp-server
+uvx montesmakes.graphiti-memory
 
 # Run with custom configuration
-uvx graphiti-mcp-server --transport stdio --port 8021 --group-id my-project
+uvx montesmakes.graphiti-memory --transport stdio --port 8021 --group-id my-project
 
 # Run with Ollama configuration
-uvx graphiti-mcp-server --ollama-llm-model llama3.2:3b --ollama-embedding-model all-minilm-l6-v2
+uvx montesmakes.graphiti-memory --ollama-llm-model llama3.2:3b --ollama-embedding-model all-minilm-l6-v2
 
 # Run with OpenAI instead of Ollama
-uvx --with openai graphiti-mcp-server --use-ollama false --model gpt-4o-mini
+uvx --with openai montesmakes.graphiti-memory --use-ollama false --model gpt-4o-mini
 ```
 
 ### 2. Install as a Tool (For Persistent Use)
@@ -32,16 +32,16 @@ If you plan to use it frequently, install it as a tool:
 
 ```bash
 # Install the tool
-uv tool install graphiti-mcp-server
+uv tool install montesmakes.graphiti-memory
 
 # Run the installed tool
-graphiti-mcp-server --help
+montesmakes.graphiti-memory --help
 
 # Update to the latest version
-uv tool upgrade graphiti-mcp-server
+uv tool upgrade montesmakes.graphiti-memory
 
 # Uninstall when no longer needed
-uv tool uninstall graphiti-mcp-server
+uv tool uninstall montesmakes.graphiti-memory
 ```
 
 ## Environment Setup
@@ -69,7 +69,7 @@ Before running, ensure you have the required services:
 
 4. **Run the server:**
    ```bash
-   uvx graphiti-mcp-server
+   uvx montesmakes.graphiti-memory
    ```
 
 ### Option B: Using OpenAI
@@ -85,7 +85,7 @@ Before running, ensure you have the required services:
 
 2. **Run with OpenAI:**
    ```bash
-   uvx graphiti-mcp-server --use-ollama false --model gpt-4o-mini
+   uvx montesmakes.graphiti-memory --use-ollama false --model gpt-4o-mini
    ```
 
 ## Configuration Examples
@@ -94,30 +94,30 @@ Before running, ensure you have the required services:
 
 ```bash
 # Default configuration (Ollama + SSE transport)
-uvx graphiti-mcp-server
+uvx montesmakes.graphiti-memory
 
 # Use stdio transport (for Claude Desktop)
-uvx graphiti-mcp-server --transport stdio
+uvx montesmakes.graphiti-memory --transport stdio
 
 # Specify a custom group ID
-uvx graphiti-mcp-server --group-id my-knowledge-graph
+uvx montesmakes.graphiti-memory --group-id my-knowledge-graph
 ```
 
 ### Ollama Customization
 
 ```bash
 # Use different models
-uvx graphiti-mcp-server \
+uvx montesmakes.graphiti-memory \
   --ollama-llm-model llama3.2:8b \
   --ollama-embedding-model all-minilm-l6-v2 \
   --ollama-embedding-dim 384
 
 # Connect to remote Ollama
-uvx graphiti-mcp-server \
+uvx montesmakes.graphiti-memory \
   --ollama-base-url http://remote-server:11434/v1
 
 # Adjust LLM parameters
-uvx graphiti-mcp-server \
+uvx montesmakes.graphiti-memory \
   --temperature 0.2 \
   --max-tokens 16384
 ```
@@ -126,14 +126,14 @@ uvx graphiti-mcp-server \
 
 ```bash
 # Development mode with custom entities
-uvx graphiti-mcp-server \
+uvx montesmakes.graphiti-memory \
   --transport sse \
   --port 8021 \
   --use-custom-entities \
   --group-id development
 
 # Production setup with specific models
-uvx graphiti-mcp-server \
+uvx montesmakes.graphiti-memory \
   --host 0.0.0.0 \
   --port 8020 \
   --ollama-llm-model mistral:7b \
@@ -153,7 +153,7 @@ Configure Claude Desktop to use the uvx-installed package:
     "graphiti-memory": {
       "command": "uvx",
       "args": [
-        "graphiti-mcp-server",
+        "montesmakes.graphiti-memory",
         "--transport", "stdio",
         "--group-id", "claude-memory"
       ],
@@ -171,7 +171,7 @@ Configure Claude Desktop to use the uvx-installed package:
 
 1. Start the server:
    ```bash
-   uvx graphiti-mcp-server --transport sse --port 8020
+   uvx montesmakes.graphiti-memory --transport sse --port 8020
    ```
 
 2. Configure Cursor:
@@ -189,24 +189,24 @@ Configure Claude Desktop to use the uvx-installed package:
 
 ### Package Not Found
 
-If `uvx graphiti-mcp-server` fails:
+If `uvx montesmakes.graphiti-memory` fails:
 
 ```bash
 # Install from local build
-uvx --from ./dist/graphiti_mcp_server-0.4.0-py3-none-any.whl graphiti-mcp-server
+uvx --from ./dist/graphiti_mcp_server-0.4.0-py3-none-any.whl montesmakes.graphiti-memory
 
 # Install from git repository
-uvx --from git+https://github.com/getzep/graphiti.git graphiti-mcp-server
+uvx --from git+https://github.com/mandelbro/graphiti-memory.git montesmakes.graphiti-memory
 ```
 
 ### Dependency Issues
 
 ```bash
 # Install with specific dependencies
-uvx --with graphiti-core>=0.18.5 --with openai>=1.99.9 graphiti-mcp-server
+uvx --with graphiti-core>=0.18.5 --with openai>=1.99.9 montesmakes.graphiti-memory
 
 # Force reinstall
-uvx --isolated graphiti-mcp-server
+uvx --isolated montesmakes.graphiti-memory
 ```
 
 ### Service Connection Issues
@@ -219,7 +219,7 @@ docker ps | grep neo4j
 curl http://localhost:11434/v1/models
 
 # Verify environment variables
-uvx graphiti-mcp-server --help
+uvx montesmakes.graphiti-memory --help
 ```
 
 ## Benefits of uvx
@@ -236,10 +236,10 @@ Once published to PyPI, users can install directly:
 
 ```bash
 # Install from PyPI (when published)
-uvx graphiti-mcp-server
+uvx montesmakes.graphiti-memory
 
 # Or install specific version
-uvx graphiti-mcp-server==0.4.0
+uvx montesmakes.graphiti-memory==0.4.0
 ```
 
 ## Development Workflow
@@ -249,10 +249,10 @@ For developers working on the package:
 ```bash
 # Test local build
 uv build
-uvx --from ./dist/graphiti_mcp_server-0.4.0-py3-none-any.whl graphiti-mcp-server
+uvx --from ./dist/graphiti_mcp_server-0.4.0-py3-none-any.whl montesmakes.graphiti-memory
 
 # Test editable installation
-uvx --with-editable . graphiti-mcp-server
+uvx --with-editable . montesmakes.graphiti-memory
 
 # Publish to PyPI
 uv publish
