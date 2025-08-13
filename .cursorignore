@@ -1,0 +1,15 @@
+__pycache__/
+.venv/
+.environments
+
+!tasks/*.md
+
+htmlcov
+chat-history
+.ruff_cache
+.pytest_cache
+cursor_rules.md
+LICENSE
+uv.lock
+coverage.xml
+!tasks/task-*.md
