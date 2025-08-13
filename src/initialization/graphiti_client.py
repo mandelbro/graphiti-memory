@@ -70,8 +70,8 @@ async def initialize_graphiti(
         embedder_client = config.embedder.create_client()
 
         # Create a dummy cross encoder to avoid OpenAI dependency
+
         from graphiti_core.cross_encoder.client import CrossEncoderClient
-        from typing import List, Tuple
 
         class DummyCrossEncoder(CrossEncoderClient):
             """A dummy cross encoder that returns documents in original order."""
@@ -79,8 +79,8 @@ async def initialize_graphiti(
             async def rank(
                 self,
                 query: str,
-                documents: List[str],
-            ) -> List[Tuple[str, float]]:
+                documents: list[str],
+            ) -> list[tuple[str, float]]:
                 # Return documents in original order with dummy scores
                 return [(doc, 1.0 - i * 0.01) for i, doc in enumerate(documents)]
 
