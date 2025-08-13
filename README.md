@@ -24,16 +24,33 @@ The Graphiti MCP server exposes the following key high-level functions of Graphi
 
 ## Quick Start
 
-### Clone the Graphiti GitHub repo
+### 🚀 Install from PyPI (Recommended)
+
+The fastest way to get started is using `uvx` to install and run from PyPI:
 
 ```bash
-git clone https://github.com/getzep/graphiti.git
+# Install and run with default settings
+uvx montesmakes.graphiti-memory
+
+# Run with custom configuration
+uvx montesmakes.graphiti-memory --transport stdio --group-id my-project
 ```
 
-or
+📖 **For detailed uvx usage and configuration options, see [UVXUSAGE.md](UVXUSAGE.md)**
+
+### 🛠️ Development Installation
+
+For development or to run from source:
 
 ```bash
-gh repo clone getzep/graphiti
+git clone https://github.com/mandelbro/graphiti-memory.git
+cd graphiti/mcp_server
+```
+
+Or with GitHub CLI:
+```bash
+gh repo clone mandelbro/graphiti-memory
+cd graphiti/mcp_server
 ```
 
 ### For Claude Desktop and other `stdio` only clients
@@ -61,6 +78,20 @@ cd graphiti && pwd
 3. Point your MCP client to `http://localhost:8020/sse`
 
 ## Installation
+
+### Quick Start with uvx (Recommended)
+
+The fastest way to get started is using `uvx` to run the server directly:
+
+```bash
+# Install and run with default settings
+uvx montesmakes.graphiti-memory
+
+# Run with custom configuration
+uvx montesmakes.graphiti-memory --transport stdio --group-id my-project
+
+# For detailed uvx usage, see UVXUSAGE.md
+```
 
 ### Prerequisites
 
@@ -509,7 +540,7 @@ To use the Graphiti MCP server with an MCP-compatible client, configure it to co
         "run",
         "--isolated",
         "--directory",
-        "/Users/<user>>/dev/zep/graphiti/mcp_server",
+        "/Users/<user>/dev/graphiti-memory",
         "--project",
         ".",
         "src/graphiti_mcp_server.py",
@@ -537,7 +568,7 @@ To use the Graphiti MCP server with an MCP-compatible client, configure it to co
         "run",
         "--isolated",
         "--directory",
-        "/Users/<user>>/dev/zep/graphiti/mcp_server",
+        "/Users/<user>/dev/graphiti-memory",
         "--project",
         ".",
         "src/graphiti_mcp_server.py",
@@ -571,7 +602,7 @@ To use the Graphiti MCP server with an MCP-compatible client, configure it to co
         "run",
         "--isolated",
         "--directory",
-        "/Users/<user>>/dev/zep/graphiti/mcp_server",
+        "/Users/<user>/dev/graphiti-memory",
         "--project",
         ".",
         "src/graphiti_mcp_server.py",
@@ -605,7 +636,7 @@ To use the Graphiti MCP server with an MCP-compatible client, configure it to co
         "run",
         "--isolated",
         "--directory",
-        "/Users/<user>>/dev/zep/graphiti/mcp_server",
+        "/Users/<user>/dev/graphiti-memory",
         "--project",
         ".",
         "src/graphiti_mcp_server.py",
@@ -812,6 +843,49 @@ GRAPHITI_TELEMETRY_ENABLED=false
 ```
 
 For complete details about what's collected and why, see the [Telemetry section in the main Graphiti README](../README.md#telemetry).
+
+## 📦 Distribution and Publishing
+
+This project is automatically published to PyPI using GitHub Actions and trusted publishing:
+
+- **PyPI**: https://pypi.org/project/montesmakes.graphiti-memory/
+- **Installation**: `uvx montesmakes.graphiti-memory` or `uv tool install montesmakes.graphiti-memory`
+
+### For Maintainers
+
+- **Release Process**: Use `scripts/prepare-release.sh` to prepare new releases
+- **Publishing Setup**: See [docs/PYPI_SETUP.md](docs/PYPI_SETUP.md) for complete PyPI configuration
+- **Manual Testing**: Use the "Manual Package Test" GitHub Action workflow
+
+Releases are automatically published to PyPI when a new GitHub release is created. TestPyPI deployment happens automatically on pushes to the `main` branch.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+### Development Setup
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/mandelbro/graphiti-memory.git
+   cd graphiti/mcp_server
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   uv sync --extra dev
+   ```
+
+3. **Run tests**:
+   ```bash
+   uv run pytest
+   ```
+
+4. **Format and lint**:
+   ```bash
+   uv run ruff format
+   uv run ruff check
+   ```
 
 ## License
 

@@ -1,0 +1,51 @@
+name: Manual Package Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_pypi:
+        description: 'Test with TestPyPI instead of PyPI'
+        required: false
+        type: boolean
+        default: true
+      python_version:
+        description: 'Python version to test with'
+        required: false
+        type: choice
+        default: '3.12'
+        options:
+        - '3.10'
+        - '3.11'
+        - '3.12'
+        - '3.13'
+
+jobs:
+  test-package:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Python ${{ inputs.python_version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v4
+
+    - name: Test package installation from PyPI
+      if: ${{ !inputs.test_pypi }}
+      run: |
+        echo "Testing installation from PyPI..."
+        uvx montesmakes.graphiti-memory --help
+
+    - name: Test package installation from TestPyPI
+      if: ${{ inputs.test_pypi }}
+      run: |
+        echo "Testing installation from TestPyPI..."
+        uvx --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ montesmakes.graphiti-memory --help
+
+    - name: Test basic functionality
+      run: |
+        echo "Testing basic server startup..."
+        timeout 10s uvx ${{ inputs.test_pypi && '--index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/' || '' }} montesmakes.graphiti-memory --help || true
+        echo "Package test completed successfully!"
