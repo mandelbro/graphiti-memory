@@ -55,6 +55,13 @@ Before running, ensure you have the required services:
    # Install Ollama (visit https://ollama.ai for instructions)
    ollama serve
    ```
+   Or with Homebrew
+   ```bash
+   # Install Ollama
+   brew install ollama
+   # Start it as a service
+   brew services start ollama
+   ```
 
 2. **Pull required models:**
    ```bash
