@@ -1,6 +1,6 @@
 [project]
 name = "montesmakes.graphiti-memory"
-version = "0.4.2"
+version = "0.4.3"
 description = "Graphiti MCP Server - Memory service for AI agents built on temporal knowledge graphs"
 readme = "README.md"
 requires-python = ">=3.10,<4"
