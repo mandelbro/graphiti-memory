@@ -6,18 +6,19 @@ are handled for the schema mapping functionality that fixes Graphiti pipeline
 processing issues.
 """
 
-import pytest
-from pydantic import BaseModel, Field
+from typing import cast
 from unittest.mock import patch
-import logging
+
+import pytest
+from openai.types.chat import ChatCompletionMessageParam
+from pydantic import BaseModel, Field
 
 from src.utils.ollama_response_converter import (
-    OllamaResponseConverter,
-    MockMessage,
     MockChoice,
-    MockResponse
+    MockMessage,
+    MockResponse,
+    OllamaResponseConverter,
 )
-
 
 # Test Models - Matching Graphiti Core Schemas
 
@@ -386,7 +387,6 @@ class TestOllamaResponseConverter:
     def test_thread_safety_basic(self, converter):
         """Basic test for thread safety of converter operations."""
         import threading
-        import time
 
         results = []
         errors = []
@@ -425,7 +425,7 @@ class TestMockMessage:
         """Test MockMessage initialization and basic properties."""
         content = "Test message content"
         message = MockMessage(content)
-        
+
         assert message.content == content
         assert message.role == "assistant"
         assert message.parsed is None
@@ -435,9 +435,9 @@ class TestMockMessage:
         """Test MockMessage model_dump method."""
         content = "Test content"
         message = MockMessage(content)
-        
+
         result = message.model_dump()
-        
+
         expected = {
             "content": content,
             "role": "assistant",
@@ -448,7 +448,7 @@ class TestMockMessage:
             "function_call": None,
             "tool_calls": None,
         }
-        
+
         assert result == expected
 
     def test_mock_message_with_parsed_content(self):
@@ -456,7 +456,7 @@ class TestMockMessage:
         message = MockMessage("test")
         test_model = SimpleModel(value="test", count=42)
         message.parsed = test_model
-        
+
         dump = message.model_dump()
         assert dump["parsed"] == test_model
 
@@ -468,7 +468,7 @@ class TestMockChoice:
         """Test MockChoice initialization."""
         content = "Choice content"
         choice = MockChoice(content)
-        
+
         assert isinstance(choice.message, MockMessage)
         assert choice.message.content == content
         assert choice.index == 0
@@ -483,10 +483,10 @@ class TestMockResponse:
         content = "Response content"
         model = "llama3.2"
         response = MockResponse(content, model)
-        
+
         assert len(response.choices) == 1
         assert isinstance(response.choices[0], MockChoice)
-        assert response.choices[0].message.content == content
+        assert response.choices[0].message.content == content  # type: ignore
         assert response.model == model
         assert response.object == "chat.completion"
         assert isinstance(response.id, str)
@@ -499,38 +499,38 @@ class TestStaticUtilityMethods:
 
     def test_messages_to_prompt_basic(self):
         """Test basic message to prompt conversion."""
-        messages = [
+        messages = cast(list[ChatCompletionMessageParam], [
             {"role": "system", "content": "You are a helpful assistant"},
             {"role": "user", "content": "Hello"},
             {"role": "assistant", "content": "Hi there!"}
-        ]
-        
+        ])
+
         result = OllamaResponseConverter.messages_to_prompt(messages)
-        
+
         expected = "System: You are a helpful assistant\nUser: Hello\nAssistant: Hi there!"
         assert result == expected
 
     def test_messages_to_prompt_empty_content(self):
         """Test message to prompt conversion with empty content."""
-        messages = [
+        messages = cast(list[ChatCompletionMessageParam], [
             {"role": "user"},  # Missing content
             {"role": "assistant", "content": "Response"}
-        ]
-        
+        ])
+
         result = OllamaResponseConverter.messages_to_prompt(messages)
-        
+
         expected = "User: \nAssistant: Response"
         assert result == expected
 
     def test_messages_to_prompt_unknown_role(self):
         """Test message to prompt conversion with unknown role."""
-        messages = [
+        messages = cast(list[ChatCompletionMessageParam], [
             {"role": "unknown", "content": "Some content"},
             {"role": "user", "content": "User message"}
-        ]
-        
+        ])
+
         result = OllamaResponseConverter.messages_to_prompt(messages)
-        
+
         # Unknown roles are ignored
         expected = "User: User message"
         assert result == expected
@@ -539,35 +539,37 @@ class TestStaticUtilityMethods:
         """Test conversion of native Ollama response to OpenAI format."""
         native_response = {"response": "This is the response"}
         model = "llama3.2"
-        
+
         result = OllamaResponseConverter.convert_native_response_to_openai(
             native_response, model
         )
-        
+
         assert isinstance(result, MockResponse)
         assert result.model == model
-        assert result.choices[0].message.content == "This is the response"
+        assert result.choices[0].message.content == "This is the response"  # type: ignore
 
     def test_convert_native_response_empty(self):
         """Test conversion with empty native response."""
         native_response = {}
         model = "llama3.2"
-        
+
         result = OllamaResponseConverter.convert_native_response_to_openai(
             native_response, model
         )
-        
+
         assert isinstance(result, MockResponse)
         assert result.model == model
+        assert result.choices[0].message is not None
         assert result.choices[0].message.content == ""
 
     def test_set_parsed_response(self):
         """Test setting parsed response on mock response."""
         response = MockResponse("content", "model")
         parsed_model = SimpleModel(value="test", count=5)
-        
+
         OllamaResponseConverter.set_parsed_response(response, parsed_model)
-        
+
+        assert response.choices[0].message is not None
         assert response.choices[0].message.parsed == parsed_model
 
     def test_set_parsed_response_no_choices(self):
@@ -575,16 +577,23 @@ class TestStaticUtilityMethods:
         response = MockResponse("content", "model")
         response.choices = []  # Clear choices
         parsed_model = SimpleModel(value="test", count=5)
-        
+
         # Should not raise an exception
         OllamaResponseConverter.set_parsed_response(response, parsed_model)
 
     def test_set_parsed_response_no_message(self):
         """Test setting parsed response on choice with no message."""
+        # Create a MockChoice that simulates no message condition
+        class MockChoiceNoMessage:
+            def __init__(self):
+                self.message = None
+                self.index = 0
+                self.finish_reason = "stop"
+
         response = MockResponse("content", "model")
-        response.choices[0].message = None
+        response.choices[0] = MockChoiceNoMessage()  # type: ignore
         parsed_model = SimpleModel(value="test", count=5)
-        
+
         # Should not raise an exception
         OllamaResponseConverter.set_parsed_response(response, parsed_model)
 
@@ -607,9 +616,9 @@ class TestAdditionalEdgeCases:
         """Test exception handling in generic schema conversion."""
         with patch.object(converter, '_convert_generic_schema', side_effect=Exception("Test error")):
             ollama_response = [{"test": "data1"}, {"test": "data2"}]
-            
+
             result = converter.convert_structured_response(ollama_response, SimpleModel)
-            
+
             # Should fall back to items structure for multi-item list
             assert result == {"items": [{"test": "data1"}, {"test": "data2"}]}
 
@@ -618,24 +627,24 @@ class TestAdditionalEdgeCases:
         with patch.object(converter, '_is_extracted_entities_schema', side_effect=Exception("Test error")):
             # Empty list should cause fallback to fail
             ollama_response = []
-            
+
             with pytest.raises(ValueError, match="Cannot convert response data"):
                 converter.convert_structured_response(ollama_response, SimpleModel)
 
     def test_generic_conversion_list_non_dict_single_item(self, converter):
         """Test generic conversion with single non-dict list item."""
         ollama_response = ["simple_string"]
-        
+
         result = converter._convert_generic_schema(ollama_response, SimpleModel)
-        
+
         assert result == {"value": "simple_string"}
 
     def test_generic_conversion_primitive_non_string(self, converter):
         """Test generic conversion with primitive non-string value."""
         ollama_response = 42
-        
+
         result = converter._convert_generic_schema(ollama_response, SimpleModel)
-        
+
         assert result == {"value": 42}
 
     def test_extracted_entities_already_wrapped_non_list(self, converter):
@@ -643,9 +652,9 @@ class TestAdditionalEdgeCases:
         ollama_response = {
             "extracted_entities": "not_a_list"
         }
-        
+
         result = converter._convert_to_extracted_entities(ollama_response)
-        
+
         # Should return as-is since it's not a list
         assert result == {"extracted_entities": "not_a_list"}
 
@@ -658,9 +667,9 @@ class TestAdditionalEdgeCases:
                 {"entity_type_id": 1, "entity": "Another Valid Entity"}
             ]
         }
-        
+
         result = converter._convert_to_extracted_entities(ollama_response)
-        
+
         # Should preserve non-dict items as-is
         assert len(result["extracted_entities"]) == 3
         assert result["extracted_entities"][0]["name"] == "Valid Entity"
@@ -670,8 +679,8 @@ class TestAdditionalEdgeCases:
     def test_generic_conversion_multiple_non_dict_items_no_list_fields(self, converter):
         """Test generic conversion with multiple non-dict items and no list fields in target schema."""
         ollama_response = ["item1", "item2", "item3"]
-        
+
         # SimpleModel has no list fields, so should wrap in items structure
         result = converter._convert_generic_schema(ollama_response, SimpleModel)
-        
+
         assert result == {"items": ["item1", "item2", "item3"]}
