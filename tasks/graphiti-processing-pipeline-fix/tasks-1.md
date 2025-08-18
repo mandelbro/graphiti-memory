@@ -194,7 +194,7 @@ class TestOllamaResponseConverter:
 
 - **Title**: Integration Point Investigation - Trace Graphiti Core Processing
 - **File**: docs.local/discovery/graphiti-core-integration-analysis.md
-- **Complete**: [ ]
+- **Complete**: [x]
 
 #### Prompt:
 
@@ -232,7 +232,7 @@ The issue occurs because we fixed the "front-door" (direct OllamaClient usage) b
 
 **Research Commands to Execute:**
 
-```bash
+\```bash
 # Find all LLM client instantiations in Graphiti Core
 find ~/.local/lib/python*/site-packages/graphiti_core/ -name "*.py" -exec grep -l "AsyncOpenAI\|OpenAI(" {} \;
 
@@ -241,11 +241,11 @@ find ~/.local/lib/python*/site-packages/graphiti_core/ -name "*.py" -exec grep -
 
 # Trace configuration flow
 find ~/.local/lib/python*/site-packages/graphiti_core/ -name "*.py" -exec grep -l "llm_client\|LLMConfig" {} \;
-```
+\```
 
 **Documentation Structure:**
 
-```markdown
+\```markdown
 # Graphiti Core Integration Analysis
 
 ## Executive Summary
@@ -272,7 +272,7 @@ find ~/.local/lib/python*/site-packages/graphiti_core/ -name "*.py" -exec grep -
 - Specific files to modify
 - Configuration changes needed
 - Testing approach
-```
+\```
 
 **Acceptance Criteria (for this task):**
 - [ ] Complete execution flow documented from add_memory to entity extraction
