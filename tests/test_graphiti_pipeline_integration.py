@@ -22,22 +22,21 @@ import logging
 import os
 import time
 import uuid
+from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import cast
+from unittest.mock import patch
 
 import pytest
-import pytest_asyncio
 from graphiti_core import Graphiti
-from graphiti_core.nodes import EpisodicNode
+from graphiti_core.nodes import EpisodeType
 from mcp.server.fastmcp import FastMCP
 
-from src.config import GraphitiConfig, GraphitiLLMConfig, Neo4jConfig
+from src.config import GraphitiConfig, GraphitiLLMConfig
 from src.initialization.graphiti_client import create_graphiti_client
 from src.initialization.server_setup import initialize_server
 from src.models import (
     ErrorResponse,
-    NodeSearchResponse,
     SuccessResponse,
 )
 from src.ollama_client import OllamaClient
@@ -51,46 +50,51 @@ logger = logging.getLogger(__name__)
 class TestGraphitiPipelineIntegration:
     """
     Comprehensive integration tests for the complete Graphiti memory operation workflow.
-    
+
     These tests verify that the schema validation fixes work correctly and that memory
     operations actually result in stored data across the entire pipeline.
     """
 
     @pytest.fixture(scope="class")
-    async def test_config(self) -> GraphitiConfig:
+    def test_config(self) -> GraphitiConfig:
         """Create test configuration for integration tests."""
+        from src.config import Neo4jConfig
+
         return GraphitiConfig(
-            neo4j_uri=os.getenv("TEST_NEO4J_URI", "bolt://localhost:7687"),
-            neo4j_user=os.getenv("TEST_NEO4J_USER", "neo4j"),
-            neo4j_password=os.getenv("TEST_NEO4J_PASSWORD", "password"),
+            neo4j=Neo4jConfig(
+                uri=os.getenv("TEST_NEO4J_URI", "bolt://localhost:7687"),
+                user=os.getenv("TEST_NEO4J_USER", "neo4j"),
+                password=os.getenv("TEST_NEO4J_PASSWORD", "password"),
+            ),
             llm=GraphitiLLMConfig(
                 model="gpt-oss:latest",
                 use_ollama=True,
-                base_url=os.getenv("TEST_OLLAMA_URL", "http://localhost:11434/v1"),
+                ollama_base_url=os.getenv("TEST_OLLAMA_URL", "http://localhost:11434/v1"),
+                ollama_llm_model="gpt-oss:latest",
                 api_key="ollama",  # Ollama doesn't require real API key
             ),
             use_custom_entities=True,
-            default_group_id="integration-test",
+            group_id="integration-test",
         )
 
     @pytest.fixture(scope="class")
-    async def graphiti_client(self, test_config: GraphitiConfig) -> Graphiti:
+    async def graphiti_client(self, test_config: GraphitiConfig) -> AsyncIterator[Graphiti]:
         """Create real Graphiti client with Ollama configuration for integration testing."""
         try:
             # Create the client using our enhanced configuration
             client = await create_graphiti_client(test_config)
-            
+
             # Build indices and constraints
             await client.build_indices_and_constraints()
-            
+
             # Clear any existing test data
             await self._cleanup_test_data(client, "integration-test")
-            
+
             yield client
-            
+
         except Exception as e:
             pytest.skip(f"Ollama server not available for integration tests: {e}")
-        
+
         finally:
             # Cleanup
             if 'client' in locals():
@@ -98,16 +102,16 @@ class TestGraphitiPipelineIntegration:
                 await client.close()
 
     @pytest.fixture(scope="class")
-    async def mcp_server(self, test_config: GraphitiConfig) -> FastMCP:
+    async def mcp_server(self, test_config: GraphitiConfig) -> AsyncIterator[FastMCP]:
         """Create MCP server with test configuration."""
         mcp = FastMCP("Test Graphiti Memory", instructions="Test server")
-        
+
         # Mock environment variables for testing
         with patch.dict(os.environ, {
-            "NEO4J_URI": test_config.neo4j_uri,
-            "NEO4J_USER": test_config.neo4j_user,
-            "NEO4J_PASSWORD": test_config.neo4j_password,
-            "OLLAMA_BASE_URL": test_config.llm.base_url,
+            "NEO4J_URI": test_config.neo4j.uri,
+            "NEO4J_USER": test_config.neo4j.user,
+            "NEO4J_PASSWORD": test_config.neo4j.password,
+            "OLLAMA_BASE_URL": test_config.llm.ollama_base_url,
             "OLLAMA_MODEL": test_config.llm.model,
         }):
             try:
@@ -115,35 +119,40 @@ class TestGraphitiPipelineIntegration:
                 await initialization_manager.start_initialization()
                 mcp_config, config, graphiti_client = await initialize_server(mcp)
                 await initialization_manager.complete_initialization()
-                
-                # Store references for cleanup
-                mcp._test_graphiti_client = graphiti_client
-                mcp._test_config = config
-                
+
+                # Store references for cleanup - dynamic attributes for test cleanup
+                mcp._test_graphiti_client = graphiti_client  # type: ignore[attr-defined]
+                mcp._test_config = config  # type: ignore[attr-defined]
+
                 yield mcp
-                
+
             except Exception as e:
                 await initialization_manager.fail_initialization(str(e))
                 pytest.skip(f"Failed to initialize MCP server: {e}")
             finally:
                 # Cleanup
                 if hasattr(mcp, '_test_graphiti_client'):
-                    await self._cleanup_test_data(mcp._test_graphiti_client, "integration-test")
-                    await mcp._test_graphiti_client.close()
+                    client = cast(Graphiti, mcp._test_graphiti_client)  # type: ignore[attr-defined]
+                    await self._cleanup_test_data(client, "integration-test")
+                    await client.close()
 
     async def _cleanup_test_data(self, client: Graphiti, group_id: str) -> None:
         """Clean up test data from the database."""
         try:
             # Get all episodes for the test group
-            episodes = await client.get_episodes(group_id=group_id, last_n=1000)
-            
+            episodes = await client.retrieve_episodes(
+                reference_time=datetime.now(UTC),
+                group_ids=[group_id],
+                last_n=1000
+            )
+
             # Delete each episode
             for episode in episodes:
                 try:
-                    await client.delete_episode(episode.uuid)
+                    await client.remove_episode(episode_uuid=episode.uuid)
                 except Exception as e:
                     logger.warning(f"Failed to delete episode {episode.uuid}: {e}")
-                    
+
         except Exception as e:
             logger.warning(f"Failed to cleanup test data: {e}")
 
@@ -151,7 +160,7 @@ class TestGraphitiPipelineIntegration:
     async def test_memory_operation_complete_lifecycle(self, mcp_server: FastMCP):
         """
         Test complete memory operation from add to retrieval.
-        
+
         This test verifies that:
         1. Memory addition succeeds and returns proper response
         2. Background processing actually processes the memory
@@ -159,8 +168,8 @@ class TestGraphitiPipelineIntegration:
         4. No silent failures occur in the pipeline
         """
         # Get the Graphiti client from the MCP server
-        graphiti_client = mcp_server._test_graphiti_client
-        
+        graphiti_client = cast(Graphiti, mcp_server._test_graphiti_client)  # type: ignore[attr-defined]
+
         # Test data
         test_name = f"Integration Test Memory {uuid.uuid4().hex[:8]}"
         test_content = """
@@ -169,7 +178,7 @@ class TestGraphitiPipelineIntegration:
         This is particularly important for real-time features that maintain persistent connections.
         """
         test_group_id = "integration-test-lifecycle"
-        
+
         # Step 1: Add memory through the tool function
         add_result = await add_memory(
             name=test_name,
@@ -178,64 +187,64 @@ class TestGraphitiPipelineIntegration:
             source="text",
             source_description="Integration test content"
         )
-        
+
         # Verify immediate response
         assert isinstance(add_result, SuccessResponse)
         assert "queued for processing" in add_result.message
         assert test_name in add_result.message
-        
+
         # Step 2: Wait for background processing to complete
         max_wait_time = 30  # seconds
         wait_interval = 1  # second
         episodes_found = []
-        
+
         for attempt in range(max_wait_time):
             try:
-                episodes = await graphiti_client.get_episodes(
-                    group_id=test_group_id,
+                episodes = await graphiti_client.retrieve_episodes(
+                    reference_time=datetime.now(UTC),
+                    group_ids=[test_group_id],
                     last_n=10
                 )
                 episodes_found = [ep for ep in episodes if ep.name == test_name]
-                
+
                 if episodes_found:
                     break
-                    
+
                 await asyncio.sleep(wait_interval)
-                
+
             except Exception as e:
                 logger.warning(f"Attempt {attempt + 1} failed to get episodes: {e}")
                 await asyncio.sleep(wait_interval)
-        
+
         # Step 3: Verify memory was actually stored
         assert len(episodes_found) > 0, f"Memory '{test_name}' was not stored after {max_wait_time} seconds"
-        
+
         stored_episode = episodes_found[0]
         assert stored_episode.name == test_name
         assert stored_episode.content == test_content
         assert stored_episode.group_id == test_group_id
-        
+
         # Step 4: Test memory retrieval through search
         search_results = await graphiti_client.search(
             query="ActionCable WebSocket subscription guarantor",
-            group_ids=[test_group_id],
-            limit=5
+            group_ids=[test_group_id]
         )
-        
+
         # Verify search finds the stored memory
-        assert len(search_results.nodes) > 0, "Search did not find the stored memory"
-        
+        assert len(search_results) > 0, "Search did not find the stored memory"
+
         # Verify entities were extracted (this is where schema validation was failing)
-        nodes_with_content = [node for node in search_results.nodes if "ActionCable" in str(node)]
-        assert len(nodes_with_content) > 0, "No entities were extracted from the memory content"
-        
+        edges_with_content = [edge for edge in search_results if "ActionCable" in str(edge)]
+        assert len(edges_with_content) > 0, "No entities were extracted from the memory content"
+
         # Cleanup
-        await graphiti_client.delete_episode(stored_episode.uuid)
+        await graphiti_client.remove_episode(episode_uuid=stored_episode.uuid)
 
     @pytest.mark.asyncio
     async def test_schema_validation_success_with_ollama(self, graphiti_client: Graphiti):
         """
         Test that schema validation passes with Ollama responses.
-        
+
         This specifically tests the fix for the ExtractedEntities schema validation
         that was causing silent failures in background processing.
         """
@@ -244,46 +253,50 @@ class TestGraphitiPipelineIntegration:
         It validates incoming data against predefined schemas and stores valid records
         in the PostgreSQL database. Error cases are logged for debugging purposes.
         """
-        
+
         test_group_id = "integration-test-schema"
         episode_name = f"Schema Test {uuid.uuid4().hex[:8]}"
-        
+
         # Add episode directly to test entity extraction
         try:
             await graphiti_client.add_episode(
                 name=episode_name,
                 episode_body=test_content,
-                source="text",
+                source=EpisodeType.text,
+                source_description="Schema validation test content",
                 group_id=test_group_id,
                 reference_time=datetime.now(UTC),
                 entity_types={}  # Use default entity extraction
             )
-            
+
             # Wait a moment for processing
             await asyncio.sleep(2)
-            
+
             # Verify episode was stored successfully
-            episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=5)
+            episodes = await graphiti_client.retrieve_episodes(
+                reference_time=datetime.now(UTC),
+                group_ids=[test_group_id],
+                last_n=5
+            )
             stored_episodes = [ep for ep in episodes if ep.name == episode_name]
-            
+
             assert len(stored_episodes) > 0, "Episode was not stored - schema validation likely failed"
-            
+
             stored_episode = stored_episodes[0]
             assert stored_episode.content == test_content
-            
+
             # Test that entity extraction worked (entities should be created)
             search_results = await graphiti_client.search(
                 query="DataProcessor service customer profile",
-                group_ids=[test_group_id],
-                limit=10
+                group_ids=[test_group_id]
             )
-            
-            # Should find nodes related to the entities
-            assert len(search_results.nodes) > 0, "No entities were extracted - schema validation failed"
-            
+
+            # Should find edges related to the entities
+            assert len(search_results) > 0, "No entities were extracted - schema validation failed"
+
             # Cleanup
-            await graphiti_client.delete_episode(stored_episode.uuid)
-            
+            await graphiti_client.remove_episode(episode_uuid=stored_episode.uuid)
+
         except Exception as e:
             pytest.fail(f"Schema validation failed with Ollama: {e}")
 
@@ -291,12 +304,12 @@ class TestGraphitiPipelineIntegration:
     async def test_background_processing_no_silent_failures(self, mcp_server: FastMCP):
         """
         Test that background processing doesn't fail silently.
-        
+
         This test specifically addresses the issue where operations appeared to succeed
         but failed during background processing without proper error reporting.
         """
-        graphiti_client = mcp_server._test_graphiti_client
-        
+        graphiti_client = cast(Graphiti, mcp_server._test_graphiti_client)  # type: ignore[attr-defined]
+
         # Test with various content types that previously caused silent failures
         test_cases = [
             {
@@ -318,10 +331,10 @@ class TestGraphitiPipelineIntegration:
                 "source": "text"
             }
         ]
-        
+
         test_group_id = "integration-test-silent-failures"
         stored_episodes = []
-        
+
         for test_case in test_cases:
             # Add memory
             result = await add_memory(
@@ -330,52 +343,56 @@ class TestGraphitiPipelineIntegration:
                 group_id=test_group_id,
                 source=test_case["source"]
             )
-            
+
             assert isinstance(result, SuccessResponse), f"Failed to queue {test_case['name']}"
-        
+
         # Wait for all background processing to complete
         max_wait_time = 45  # seconds for multiple operations
         wait_interval = 2   # seconds
-        
-        for attempt in range(max_wait_time // wait_interval):
-            episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=10)
+
+        for _attempt in range(max_wait_time // wait_interval):
+            episodes = await graphiti_client.retrieve_episodes(
+                reference_time=datetime.now(UTC),
+                group_ids=[test_group_id],
+                last_n=10
+            )
             stored_episodes = [ep for ep in episodes if any(tc["name"] == ep.name for tc in test_cases)]
-            
+
             if len(stored_episodes) == len(test_cases):
                 break
-                
+
             await asyncio.sleep(wait_interval)
-        
+
         # Verify all memories were processed successfully
         assert len(stored_episodes) == len(test_cases), f"Silent failures detected: expected {len(test_cases)} memories, got {len(stored_episodes)}"
-        
+
         # Verify content integrity
         for test_case in test_cases:
             matching_episodes = [ep for ep in stored_episodes if ep.name == test_case["name"]]
             assert len(matching_episodes) == 1, f"Episode '{test_case['name']}' not found or duplicated"
-            
+
             episode = matching_episodes[0]
             assert episode.content == test_case["content"], f"Content mismatch for '{test_case['name']}'"
-        
+
         # Cleanup
         for episode in stored_episodes:
-            await graphiti_client.delete_episode(episode.uuid)
+            await graphiti_client.remove_episode(episode_uuid=episode.uuid)
 
     @pytest.mark.asyncio
     async def test_concurrent_memory_operations(self, mcp_server: FastMCP):
         """
         Test multiple concurrent memory operations.
-        
+
         This verifies that the schema validation fixes work under concurrent load
         and that there are no race conditions in the background processing.
         """
-        graphiti_client = mcp_server._test_graphiti_client
+        graphiti_client = cast(Graphiti, mcp_server._test_graphiti_client)  # type: ignore[attr-defined]
         test_group_id = "integration-test-concurrent"
-        
+
         # Create multiple concurrent memory operations
         num_operations = 5
         operations = []
-        
+
         for i in range(num_operations):
             operation = add_memory(
                 name=f"Concurrent Memory {i}",
@@ -384,10 +401,10 @@ class TestGraphitiPipelineIntegration:
                 source="text"
             )
             operations.append(operation)
-        
+
         # Execute all operations concurrently
         results = await asyncio.gather(*operations, return_exceptions=True)
-        
+
         # Verify all operations succeeded
         successful_results = 0
         for i, result in enumerate(results):
@@ -397,141 +414,161 @@ class TestGraphitiPipelineIntegration:
                 successful_results += 1
             else:
                 pytest.fail(f"Concurrent operation {i} returned unexpected result: {result}")
-        
+
         assert successful_results == num_operations, f"Expected {num_operations} successful operations, got {successful_results}"
-        
+
         # Wait for all background processing to complete
         max_wait_time = 60  # seconds for concurrent operations
         wait_interval = 2   # seconds
-        
+
         stored_episodes = []
-        for attempt in range(max_wait_time // wait_interval):
-            episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=20)
+        for _attempt in range(max_wait_time // wait_interval):
+            episodes = await graphiti_client.retrieve_episodes(
+                reference_time=datetime.now(UTC),
+                group_ids=[test_group_id],
+                last_n=20
+            )
             stored_episodes = [ep for ep in episodes if ep.name.startswith("Concurrent Memory")]
-            
+
             if len(stored_episodes) >= num_operations:
                 break
-                
+
             await asyncio.sleep(wait_interval)
-        
+
         # Verify all concurrent operations were processed
         assert len(stored_episodes) >= num_operations, f"Concurrent processing failed: expected at least {num_operations} memories, got {len(stored_episodes)}"
-        
+
         # Cleanup
         for episode in stored_episodes:
-            await graphiti_client.delete_episode(episode.uuid)
+            await graphiti_client.remove_episode(episode_uuid=episode.uuid)
 
     @pytest.mark.asyncio
     async def test_large_memory_content_processing(self, graphiti_client: Graphiti):
         """
         Test processing of large memory content.
-        
+
         This verifies that the schema validation fixes work correctly even with
         large content that might produce complex entity extraction results.
         """
         # Create large content that will generate many entities
         large_content = """
         The enterprise software architecture consists of multiple microservices that handle different aspects of the business logic.
-        
+
         The authentication service manages user credentials, OAuth2 integration, and session handling. It connects to Active Directory
         for enterprise customers and supports SAML, OpenID Connect, and traditional username/password authentication methods.
-        
+
         The payment processing service integrates with Stripe, PayPal, and Square for credit card transactions. It handles subscription
         billing, one-time payments, refunds, and dispute management. The service maintains PCI compliance and encrypts all sensitive data.
-        
+
         The notification service sends emails, SMS messages, and push notifications to users. It integrates with SendGrid for email
         delivery, Twilio for SMS, and Firebase for mobile push notifications. The service supports template management and delivery tracking.
-        
+
         The analytics service collects user behavior data, generates reports, and provides business intelligence dashboards. It uses
         ClickHouse for real-time analytics, Elasticsearch for log analysis, and Grafana for visualization.
-        
+
         The content management service handles file uploads, image processing, and document storage. It uses AWS S3 for storage,
         CloudFront for content delivery, and ImageMagick for image transformations.
-        
+
         All services communicate through a message queue system using RabbitMQ and maintain their own PostgreSQL databases.
         The entire infrastructure runs on Kubernetes with Docker containers and is monitored using Prometheus and Grafana.
         """
-        
+
         test_group_id = "integration-test-large-content"
         episode_name = f"Large Content Test {uuid.uuid4().hex[:8]}"
-        
+
         start_time = time.time()
-        
+
         # Add the large content episode
         await graphiti_client.add_episode(
             name=episode_name,
             episode_body=large_content,
-            source="text",
+            source=EpisodeType.text,
+            source_description="Large content performance test",
             group_id=test_group_id,
             reference_time=datetime.now(UTC),
             entity_types={}
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Wait for processing to complete
         await asyncio.sleep(5)  # Large content may take longer to process
-        
+
         # Verify episode was stored
-        episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=5)
+        episodes = await graphiti_client.retrieve_episodes(
+            reference_time=datetime.now(UTC),
+            group_ids=[test_group_id],
+            last_n=5
+        )
         stored_episodes = [ep for ep in episodes if ep.name == episode_name]
-        
+
         assert len(stored_episodes) > 0, "Large content episode was not stored"
-        
+
         stored_episode = stored_episodes[0]
         assert stored_episode.content == large_content
-        
+
         # Verify entity extraction worked with large content
         search_results = await graphiti_client.search(
             query="authentication service OAuth2 payment processing",
-            group_ids=[test_group_id],
-            limit=20
+            group_ids=[test_group_id]
         )
-        
+
         # Should extract many entities from the large content
-        assert len(search_results.nodes) > 0, "No entities extracted from large content"
-        
+        assert len(search_results) > 0, "No entities extracted from large content"
+
         # Verify performance is acceptable (< 30 seconds for large content)
         assert processing_time < 30, f"Large content processing took too long: {processing_time:.2f} seconds"
-        
+
         # Cleanup
-        await graphiti_client.delete_episode(stored_episode.uuid)
+        await graphiti_client.remove_episode(episode_uuid=stored_episode.uuid)
 
     @pytest.mark.asyncio
     async def test_ollama_health_and_connectivity(self, test_config: GraphitiConfig):
         """
         Test Ollama server health and connectivity for integration tests.
-        
+
         This ensures that Ollama is properly configured and accessible before
         running the main integration tests.
         """
         try:
             # Create Ollama client for health check
+            from graphiti_core.llm_client.config import LLMConfig
+
+            llm_config = LLMConfig(
+                api_key="abc",
+                model=test_config.llm.ollama_llm_model,
+                base_url=test_config.llm.ollama_base_url,
+                temperature=test_config.llm.temperature,
+                max_tokens=test_config.llm.max_tokens,
+            )
+
             ollama_client = OllamaClient(
-                config=test_config.llm,
+                config=llm_config,
                 model_parameters={}
             )
-            
+
             # Test health check
             is_healthy, health_message = await ollama_client.check_health()
             assert is_healthy, f"Ollama server is not healthy: {health_message}"
-            
+
             # Test model availability
             is_available, model_message = await ollama_client.validate_model_available(test_config.llm.model)
             assert is_available, f"Ollama model '{test_config.llm.model}' is not available: {model_message}"
-            
+
             # Test basic completion to verify integration
-            messages = [{"role": "user", "content": "Hello, this is a test message."}]
+            from openai.types.chat import ChatCompletionMessageParam
+
+            messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": "Hello, this is a test message."}]
             response = await ollama_client._create_completion(
                 model=test_config.llm.model,
                 messages=messages,
                 temperature=0.1,
                 max_tokens=50
             )
-            
+
             assert response is not None, "Failed to get response from Ollama"
             assert response.choices[0].message.content, "Empty response from Ollama"
-            
+
         except Exception as e:
             pytest.skip(f"Ollama integration test requirements not met: {e}")
 
@@ -539,7 +576,7 @@ class TestGraphitiPipelineIntegration:
     async def test_error_handling_and_graceful_degradation(self, mcp_server: FastMCP):
         """
         Test error scenarios and graceful degradation.
-        
+
         This verifies that the system handles errors gracefully and provides
         appropriate feedback when issues occur.
         """
@@ -561,9 +598,9 @@ class TestGraphitiPipelineIntegration:
                 "expected_error": False  # Unicode should be handled correctly
             }
         ]
-        
+
         test_group_id = "integration-test-error-handling"
-        
+
         for test_case in invalid_test_cases:
             try:
                 result = await add_memory(
@@ -572,12 +609,12 @@ class TestGraphitiPipelineIntegration:
                     group_id=test_group_id,
                     source="text"
                 )
-                
+
                 if test_case["expected_error"]:
                     assert isinstance(result, ErrorResponse), f"Expected error for {test_case['name']}, but got success"
                 else:
                     assert isinstance(result, SuccessResponse), f"Expected success for {test_case['name']}, but got error: {result}"
-                    
+
             except Exception as e:
                 if not test_case["expected_error"]:
                     pytest.fail(f"Unexpected exception for {test_case['name']}: {e}")
@@ -586,12 +623,12 @@ class TestGraphitiPipelineIntegration:
     async def test_memory_search_integration(self, graphiti_client: Graphiti):
         """
         Test memory search functionality with the schema validation fixes.
-        
+
         This verifies that memories can be properly searched and retrieved after
         being processed through the fixed pipeline.
         """
         test_group_id = "integration-test-search"
-        
+
         # Add memories with different searchable content
         memories = [
             {
@@ -610,22 +647,22 @@ class TestGraphitiPipelineIntegration:
                 "entities": ["database", "normalization", "indexes"]
             }
         ]
-        
+
         # Add all memories
-        stored_episodes = []
         for memory in memories:
             await graphiti_client.add_episode(
                 name=memory["name"],
                 episode_body=memory["content"],
-                source="text",
+                source=EpisodeType.text,
+                source_description="Search integration test content",
                 group_id=test_group_id,
                 reference_time=datetime.now(UTC),
                 entity_types={}
             )
-        
+
         # Wait for processing
         await asyncio.sleep(3)
-        
+
         # Test various search queries
         search_tests = [
             {"query": "Python development testing", "expected_matches": ["Python Development Best Practices"]},
@@ -633,31 +670,34 @@ class TestGraphitiPipelineIntegration:
             {"query": "database normalization indexes", "expected_matches": ["Database Design Principles"]},
             {"query": "testing", "expected_matches": ["Python Development Best Practices", "React Frontend Architecture"]},
         ]
-        
+
         for search_test in search_tests:
             search_results = await graphiti_client.search(
                 query=search_test["query"],
-                group_ids=[test_group_id],
-                limit=10
+                group_ids=[test_group_id]
             )
-            
+
             # Verify search found relevant results
-            assert len(search_results.nodes) > 0, f"No results found for query: {search_test['query']}"
-            
+            assert len(search_results) > 0, f"No results found for query: {search_test['query']}"
+
             # Note: We can't easily verify exact matches without more complex result analysis
             # but the fact that we get results indicates the schema validation is working
-        
+
         # Cleanup
-        episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=10)
+        episodes = await graphiti_client.retrieve_episodes(
+            reference_time=datetime.now(UTC),
+            group_ids=[test_group_id],
+            last_n=10
+        )
         for episode in episodes:
-            await graphiti_client.delete_episode(episode.uuid)
+            await graphiti_client.remove_episode(episode_uuid=episode.uuid)
 
 
 @pytest.mark.performance
 class TestPerformanceValidationBasic:
     """
     Basic performance validation tests as part of integration testing.
-    
+
     These tests ensure that the schema validation fixes don't introduce
     unacceptable performance overhead.
     """
@@ -666,37 +706,42 @@ class TestPerformanceValidationBasic:
     async def test_memory_operation_performance_baseline(self, graphiti_client: Graphiti):
         """
         Test baseline performance for memory operations.
-        
+
         This establishes a performance baseline to ensure the fixes don't
         introduce significant overhead.
         """
         test_content = "This is a performance test memory with moderate content length for baseline measurement."
         test_group_id = "performance-test"
-        
+
         # Measure performance of memory addition
         start_time = time.time()
-        
+
         await graphiti_client.add_episode(
             name="Performance Test Memory",
             episode_body=test_content,
-            source="text",
+            source=EpisodeType.text,
+            source_description="Performance baseline test content",
             group_id=test_group_id,
             reference_time=datetime.now(UTC),
             entity_types={}
         )
-        
+
         processing_time = time.time() - start_time
-        
+
         # Performance should be reasonable (< 10 seconds for simple content)
         assert processing_time < 10, f"Memory operation took too long: {processing_time:.2f} seconds"
-        
+
         # Wait for background processing
         await asyncio.sleep(2)
-        
+
         # Cleanup
-        episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=5)
+        episodes = await graphiti_client.retrieve_episodes(
+            reference_time=datetime.now(UTC),
+            group_ids=[test_group_id],
+            last_n=5
+        )
         for episode in episodes:
-            await graphiti_client.delete_episode(episode.uuid)
+            await graphiti_client.remove_episode(episode_uuid=episode.uuid)
 
     @pytest.mark.asyncio
     async def test_search_performance_baseline(self, graphiti_client: Graphiti):
@@ -704,36 +749,40 @@ class TestPerformanceValidationBasic:
         Test baseline performance for search operations.
         """
         test_group_id = "search-performance-test"
-        
+
         # Add a memory to search for
         await graphiti_client.add_episode(
             name="Search Performance Test",
             episode_body="This content is for testing search performance and response times.",
-            source="text",
+            source=EpisodeType.text,
+            source_description="Search performance test content",
             group_id=test_group_id,
             reference_time=datetime.now(UTC),
             entity_types={}
         )
-        
+
         # Wait for processing
         await asyncio.sleep(2)
-        
+
         # Measure search performance
         start_time = time.time()
-        
+
         search_results = await graphiti_client.search(
             query="search performance testing",
-            group_ids=[test_group_id],
-            limit=10
+            group_ids=[test_group_id]
         )
-        
+
         search_time = time.time() - start_time
-        
+
         # Search should be fast (< 5 seconds)
         assert search_time < 5, f"Search took too long: {search_time:.2f} seconds"
-        assert len(search_results.nodes) >= 0, "Search should return results or empty list"
-        
+        assert len(search_results) >= 0, "Search should return results or empty list"
+
         # Cleanup
-        episodes = await graphiti_client.get_episodes(group_id=test_group_id, last_n=5)
+        episodes = await graphiti_client.retrieve_episodes(
+            reference_time=datetime.now(UTC),
+            group_ids=[test_group_id],
+            last_n=5
+        )
         for episode in episodes:
-            await graphiti_client.delete_episode(episode.uuid)
+            await graphiti_client.remove_episode(episode_uuid=episode.uuid)
