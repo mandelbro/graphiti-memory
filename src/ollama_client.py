@@ -104,7 +104,7 @@ class OllamaClient(BaseOpenAIClient):
                 max_keepalive_connections=5, max_connections=10, keepalive_expiry=30.0
             )
 
-            timeout = httpx.Timeout(connect=5.0, read=60.0, write=5.0, pool=2.0)
+            timeout = httpx.Timeout(connect=5.0, read=300.0, write=5.0, pool=2.0)
 
             self._http_client = httpx.AsyncClient(limits=limits, timeout=timeout)
 
@@ -119,11 +119,15 @@ class OllamaClient(BaseOpenAIClient):
         response_model: type[BaseModel],
         **kwargs: Any,
     ):
-        """Enhanced structured completion with JSON parsing for Ollama.
+        """Enhanced structured completion with comprehensive schema conversion.
 
-        This method attempts to parse JSON responses from Ollama and populate
-        the parsed field when successful, providing better structured output
-        handling while maintaining compatibility with the base client.
+        This method integrates the OllamaResponseConverter to handle schema mapping
+        between Ollama response formats and expected Graphiti Core schemas, ensuring
+        proper validation across all memory operations including background processing.
+
+        The converter automatically detects schema types (like ExtractedEntities) and
+        applies the appropriate field mappings (e.g., "entity" -> "name") to ensure
+        compatibility with Graphiti Core's expected schemas.
         """
         # Get regular completion from Ollama
         # Accept and ignore extra kwargs (e.g., reasoning) for compatibility with callers
@@ -141,18 +145,27 @@ class OllamaClient(BaseOpenAIClient):
             response_model=response_model,
         )
 
-        # Attempt to parse structured response
+        # Attempt to parse and convert structured response using the response converter
         try:
             content = response.choices[0].message.content
-            if content and content.strip().startswith("{"):
-                # Try to parse as JSON
+            # Check if content looks like JSON (objects or arrays)
+            if content and (content.strip().startswith("{") or content.strip().startswith("[")):
+                # Parse the JSON content
                 parsed_data = json.loads(content.strip())
-                # Validate against the response model
-                parsed_model = response_model(**parsed_data)
-                # Update the response with parsed data using converter utility
+
+                # Use the response converter for comprehensive schema mapping
+                converted_data = self._response_converter.convert_structured_response(
+                    parsed_data, response_model
+                )
+
+                # Validate the converted data with the target schema
+                parsed_model = response_model(**converted_data)
+
+                # Update the response with the parsed and validated model
                 self._response_converter.set_parsed_response(response, parsed_model)
+
                 logger.debug(
-                    f"Successfully parsed structured response for model {model}"
+                    f"Successfully converted and validated response for {response_model.__name__} with model {model}"
                 )
 
         except json.JSONDecodeError as e:
@@ -162,12 +175,17 @@ class OllamaClient(BaseOpenAIClient):
             # Continue with parsed=None, which is fine for fallback handling
         except ValidationError as e:
             logger.warning(
-                f"Failed to validate parsed data against {response_model.__name__} for model {model}: {e}"
+                f"Failed to validate converted data against {response_model.__name__} for model {model}: {e}"
+            )
+            # Continue with parsed=None, which is fine for fallback handling
+        except ValueError as e:
+            logger.warning(
+                f"Schema conversion failed for {response_model.__name__} with model {model}: {e}"
             )
             # Continue with parsed=None, which is fine for fallback handling
         except Exception as e:
             logger.warning(
-                f"Unexpected error during structured response parsing for model {model}: {e}"
+                f"Unexpected error during structured response processing for model {model}: {e}"
             )
             # Continue with parsed=None, which is fine for fallback handling
 
@@ -207,10 +225,35 @@ class OllamaClient(BaseOpenAIClient):
         if max_tokens is not None:
             payload["options"]["num_predict"] = max_tokens
 
-        client = await self._get_http_client()
-        response = await client.post(api_url, json=payload, timeout=60.0)
-        response.raise_for_status()
-        response_data = response.json()
+        try:
+            client = await self._get_http_client()
+            response = await client.post(api_url, json=payload, timeout=300.0)
+            response.raise_for_status()
+            response_data = response.json()
+        except httpx.TimeoutException as e:
+            logger.error(
+                f"Ollama request timed out for model '{model}' after 300 seconds. "
+                f"Consider using a smaller context size or faster model. Error: {e}"
+            )
+            raise TimeoutError(
+                f"Ollama request timed out for model '{model}'. Try reducing context size or using a faster model."
+            ) from e
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.error(f"Model '{model}' not found on Ollama server at {api_url}")
+                raise ValueError(f"Model '{model}' not found on Ollama server") from e
+            elif e.response.status_code >= 500:
+                logger.error(f"Ollama server error for model '{model}': {e.response.text}")
+                raise ConnectionError(f"Ollama server error: {e.response.text}") from e
+            else:
+                logger.error(f"HTTP error {e.response.status_code} for model '{model}': {e.response.text}")
+                raise
+        except httpx.ConnectError as e:
+            logger.error(f"Cannot connect to Ollama server at {api_url}. Is Ollama running? Error: {e}")
+            raise ConnectionError(f"Cannot connect to Ollama server at {api_url}. Is Ollama running?") from e
+        except Exception as e:
+            logger.error(f"Unexpected error in Ollama request for model '{model}': {e}")
+            raise
 
         # Convert native response to OpenAI format
         return self._response_converter.convert_native_response_to_openai(
