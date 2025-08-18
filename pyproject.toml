@@ -119,6 +119,7 @@ markers = [
     "unit: Unit tests",
     "integration: Integration tests",
     "e2e: End-to-end tests",
+    "performance: Performance tests",
 ]
 asyncio_mode = "auto"
 
