@@ -117,6 +117,7 @@ class OllamaClient(BaseOpenAIClient):
         temperature: float | None,
         max_tokens: int,
         response_model: type[BaseModel],
+        **kwargs: Any,
     ):
         """Enhanced structured completion with JSON parsing for Ollama.
 
@@ -125,6 +126,11 @@ class OllamaClient(BaseOpenAIClient):
         handling while maintaining compatibility with the base client.
         """
         # Get regular completion from Ollama
+        # Accept and ignore extra kwargs (e.g., reasoning) for compatibility with callers
+        if "reasoning" in kwargs:
+            # Some callers pass a reasoning dict not supported by Ollama
+            logger.debug("Ignoring unsupported 'reasoning' argument in structured completion")
+
         response = await self._create_completion(
             model=model,
             messages=messages,
