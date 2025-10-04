@@ -4,11 +4,11 @@
 
 llm:
   # Basic LLM configuration
-  model: "gpt-4o-mini"
-  small_model: "gpt-4o-mini"
+  model: "gpt-5-mini"
+  small_model: "gpt-5-nano"
   base_url: "https://api.openai.com/v1"
   temperature: 0.1
-  max_tokens: 8192
+  max_tokens: 25000
 
   # OpenAI-specific parameters
   model_parameters:

@@ -332,6 +332,22 @@ class GraphitiLLMConfig(BaseModel):
             if self.azure_openai_use_managed_identity:
                 # Use managed identity for authentication
                 token_provider = create_azure_credential_token_provider()
+                openai_enable_temperature = (
+                    os.environ.get("OPENAI_ENABLE_TEMPERATURE", "false").lower()
+                    == "true"
+                )
+
+                config = LLMConfig(
+                    api_key=self.api_key,
+                    model=self.model,
+                    small_model=self.small_model,
+                )
+                # Always set max_tokens
+                config.max_tokens = self.max_tokens
+                # Only include temperature when explicitly enabled
+                if openai_enable_temperature:
+                    config.temperature = self.temperature
+
                 return AzureOpenAILLMClient(
                     azure_client=AsyncAzureOpenAI(
                         azure_endpoint=self.azure_openai_endpoint,
@@ -339,16 +355,26 @@ class GraphitiLLMConfig(BaseModel):
                         api_version=self.azure_openai_api_version,
                         azure_ad_token_provider=token_provider,
                     ),
-                    config=LLMConfig(
-                        api_key=self.api_key,
-                        model=self.model,
-                        small_model=self.small_model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                    ),
+                    config=config,
                 )
             elif self.api_key:
                 # Use API key for authentication
+                openai_enable_temperature = (
+                    os.environ.get("OPENAI_ENABLE_TEMPERATURE", "false").lower()
+                    == "true"
+                )
+
+                config = LLMConfig(
+                    api_key=self.api_key,
+                    model=self.model,
+                    small_model=self.small_model,
+                )
+                # Always set max_tokens
+                config.max_tokens = self.max_tokens
+                # Only include temperature when explicitly enabled
+                if openai_enable_temperature:
+                    config.temperature = self.temperature
+
                 return AzureOpenAILLMClient(
                     azure_client=AsyncAzureOpenAI(
                         azure_endpoint=self.azure_openai_endpoint,
@@ -356,13 +382,7 @@ class GraphitiLLMConfig(BaseModel):
                         api_version=self.azure_openai_api_version,
                         api_key=self.api_key,
                     ),
-                    config=LLMConfig(
-                        api_key=self.api_key,
-                        model=self.model,
-                        small_model=self.small_model,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens,
-                    ),
+                    config=config,
                 )
             else:
                 raise ValueError(
@@ -376,8 +396,14 @@ class GraphitiLLMConfig(BaseModel):
             api_key=self.api_key, model=self.model, small_model=self.small_model
         )
 
-        # Set temperature and max_tokens
-        llm_client_config.temperature = self.temperature
+        # Always set max_tokens
         llm_client_config.max_tokens = self.max_tokens
+
+        # Only include temperature for OpenAI when explicitly enabled
+        openai_enable_temperature = (
+            os.environ.get("OPENAI_ENABLE_TEMPERATURE", "false").lower() == "true"
+        )
+        if openai_enable_temperature:
+            llm_client_config.temperature = self.temperature
 
         return OpenAIClient(config=llm_client_config)

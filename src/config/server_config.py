@@ -27,7 +27,8 @@ class GraphitiConfig(BaseModel):
         """Create a configuration instance from environment variables."""
         return cls(
             llm=GraphitiLLMConfig.from_env(),
-            embedder=GraphitiEmbedderConfig.from_env(),
+            # Use YAML+env for embedder to align with LLM selection
+            embedder=GraphitiEmbedderConfig.from_yaml_and_env(),
             neo4j=Neo4jConfig.from_env(),
         )
 
@@ -36,7 +37,7 @@ class GraphitiConfig(BaseModel):
         """Create a configuration instance from YAML files and environment variables."""
         return cls(
             llm=GraphitiLLMConfig.from_yaml_and_env(),
-            embedder=GraphitiEmbedderConfig.from_env(),  # TODO: Add YAML support for embedder
+            embedder=GraphitiEmbedderConfig.from_yaml_and_env(),
             neo4j=Neo4jConfig.from_env(),  # TODO: Add YAML support for Neo4j
         )
 

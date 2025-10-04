@@ -61,13 +61,13 @@ services:
       - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
       - NEO4J_USER=${NEO4J_USER:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-demodemo}
-      - USE_OLLAMA=true
+      - USE_OLLAMA=${USE_OLLAMA:-true}
       - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
       - OLLAMA_LLM_MODEL=deepseek-r1:7b
       - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
       - OLLAMA_EMBEDDING_DIM=768
       - LLM_MAX_TOKENS=32768
-      - OPENAI_API_KEY=abc
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-abc}
       - PATH=/root/.local/bin:${PATH}
       - SEMAPHORE_LIMIT=${SEMAPHORE_LIMIT:-10}
       - MCP_SERVER_PORT=${MCP_SERVER_PORT:-8020}

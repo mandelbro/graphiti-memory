@@ -37,6 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 # Copy application code
 COPY src/ ./src/
+COPY config/ ./config/
 
 # Change ownership to app user
 RUN chown -Rv app:app /app
