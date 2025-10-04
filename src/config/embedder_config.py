@@ -15,6 +15,7 @@ from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from openai import AsyncAzureOpenAI
 from pydantic import BaseModel
 
+from src.config_loader import config_loader
 from src.utils import create_azure_credential_token_provider
 
 logger = logging.getLogger(__name__)
@@ -41,20 +42,31 @@ class GraphitiEmbedderConfig(BaseModel):
     ollama_embedding_dim: int = 768
 
     @classmethod
-    def from_env(cls) -> "GraphitiEmbedderConfig":
-        """Create embedder configuration from environment variables."""
-        # Check if Ollama should be used (default to True)
-        use_ollama = os.environ.get("USE_OLLAMA", "true").lower() == "true"
+    def from_yaml_and_env(cls) -> "GraphitiEmbedderConfig":
+        """Create embedder configuration from provider YAML and environment variables."""
+        # Decide provider based on USE_OLLAMA
+        use_ollama = (
+            config_loader.get_env_value("USE_OLLAMA", "true", str).lower() == "true"
+        )
 
         if use_ollama:
-            # Ollama configuration
-            ollama_base_url = os.environ.get(
-                "OLLAMA_BASE_URL", "http://localhost:11434/v1"
+            # Load Ollama YAML (with local overrides) for embedder
+            try:
+                yaml_config = config_loader.load_provider_config("ollama")
+                embed_config = yaml_config.get("embedder", {})
+            except Exception as e:
+                logger.warning(f"Failed to load Ollama embedder YAML: {e}")
+                embed_config = {}
+
+            ollama_base_url = config_loader.get_env_value(
+                "OLLAMA_BASE_URL", embed_config.get("base_url", "http://localhost:11434/v1")
             )
-            ollama_embedding_model = os.environ.get(
-                "OLLAMA_EMBEDDING_MODEL", DEFAULT_EMBEDDER_MODEL
+            ollama_embedding_model = config_loader.get_env_value(
+                "OLLAMA_EMBEDDING_MODEL", embed_config.get("model", DEFAULT_EMBEDDER_MODEL)
             )
-            ollama_embedding_dim = int(os.environ.get("OLLAMA_EMBEDDING_DIM", "768"))
+            ollama_embedding_dim = config_loader.get_env_value(
+                "OLLAMA_EMBEDDING_DIM", embed_config.get("dimension", 768), int
+            )
 
             return cls(
                 model=ollama_embedding_model,
@@ -65,66 +77,68 @@ class GraphitiEmbedderConfig(BaseModel):
                 ollama_embedding_dim=ollama_embedding_dim,
             )
 
-        # OpenAI/Azure OpenAI configuration (existing logic)
-        # Get model from environment, or use default if not set or empty
-        model_env = os.environ.get("EMBEDDER_MODEL_NAME", "")
-        model = model_env if model_env.strip() else DEFAULT_EMBEDDER_MODEL
+        # OpenAI or Azure OpenAI
+        azure_openai_endpoint = os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT", None) or os.environ.get("AZURE_OPENAI_ENDPOINT", None)
 
-        azure_openai_endpoint = os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT", None)
-        azure_openai_api_version = os.environ.get(
-            "AZURE_OPENAI_EMBEDDING_API_VERSION", None
-        )
-        azure_openai_deployment_name = os.environ.get(
-            "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME", None
-        )
-        azure_openai_use_managed_identity = (
-            os.environ.get("AZURE_OPENAI_USE_MANAGED_IDENTITY", "false").lower()
-            == "true"
-        )
+        try:
+            if azure_openai_endpoint is not None:
+                yaml_config = config_loader.load_provider_config("azure_openai")
+            else:
+                yaml_config = config_loader.load_provider_config("openai")
+            embed_config = yaml_config.get("embedder", {})
+        except Exception as e:
+            logger.warning(f"Failed to load OpenAI/Azure embedder YAML: {e}")
+            embed_config = {}
+
+        model = embed_config.get("model", "text-embedding-3-small")
+
         if azure_openai_endpoint is not None:
-            # Setup for Azure OpenAI API
-            # Log if empty deployment name was provided
+            # Azure OpenAI setup
+            azure_openai_api_version = os.environ.get(
+                "AZURE_OPENAI_EMBEDDING_API_VERSION", None
+            ) or os.environ.get("AZURE_OPENAI_API_VERSION", None)
             azure_openai_deployment_name = os.environ.get(
                 "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME", None
+            ) or os.environ.get("AZURE_OPENAI_DEPLOYMENT_NAME", None)
+            azure_openai_use_managed_identity = (
+                os.environ.get("AZURE_OPENAI_USE_MANAGED_IDENTITY", "false").lower()
+                == "true"
             )
+
             if azure_openai_deployment_name is None:
                 logger.error(
                     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME environment variable not set"
                 )
-
                 raise ValueError(
                     "AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME environment variable not set"
                 )
 
-            if not azure_openai_use_managed_identity:
-                # api key
-                api_key = os.environ.get(
-                    "AZURE_OPENAI_EMBEDDING_API_KEY", None
-                ) or os.environ.get("OPENAI_API_KEY", None)
-            else:
-                # Managed identity
-                api_key = None
+            api_key = (
+                None if azure_openai_use_managed_identity else os.environ.get("AZURE_OPENAI_EMBEDDING_API_KEY", None) or os.environ.get("OPENAI_API_KEY", None)
+            )
 
             return cls(
-                azure_openai_use_managed_identity=azure_openai_use_managed_identity,
-                azure_openai_endpoint=azure_openai_endpoint,
+                model=model,
                 api_key=api_key,
+                azure_openai_endpoint=azure_openai_endpoint,
                 azure_openai_api_version=azure_openai_api_version,
                 azure_openai_deployment_name=azure_openai_deployment_name,
+                azure_openai_use_managed_identity=azure_openai_use_managed_identity,
                 use_ollama=False,
             )
-        else:
-            return cls(
-                model=model,
-                api_key=os.environ.get("OPENAI_API_KEY"),
-                use_ollama=False,
-            )
+
+        # OpenAI setup
+        return cls(
+            model=model,
+            api_key=os.environ.get("OPENAI_API_KEY"),
+            use_ollama=False,
+        )
 
     @classmethod
     def from_cli_and_env(cls, args: argparse.Namespace) -> "GraphitiEmbedderConfig":
-        """Create embedder configuration from CLI arguments, falling back to environment variables."""
-        # Start with environment-based config
-        config = cls.from_env()
+        """Create embedder configuration from CLI arguments, falling back to YAML and environment variables."""
+        # Start with YAML+env based config
+        config = cls.from_yaml_and_env()
 
         # CLI arguments override environment variables when provided
         if hasattr(args, "use_ollama") and args.use_ollama is not None:
