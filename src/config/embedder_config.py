@@ -95,6 +95,11 @@ class GraphitiEmbedderConfig(BaseModel):
             embed_config = {}
 
         model = embed_config.get("model", "text-embedding-3-small")
+        # Backward compatibility: allow EMBEDDER_MODEL_NAME to override model for
+        # OpenAI and Azure OpenAI providers (does not affect Ollama)
+        env_model_override = os.environ.get("EMBEDDER_MODEL_NAME")
+        if env_model_override:
+            model = env_model_override
 
         if azure_openai_endpoint is not None:
             # Azure OpenAI setup
