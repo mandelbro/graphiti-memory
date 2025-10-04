@@ -11,6 +11,8 @@ This is an experimental Model Context Protocol (MCP) server implementation for G
 Graphiti's key functionality through the MCP protocol, allowing AI assistants to interact with Graphiti's knowledge
 graph capabilities.
 
+[![CI](https://github.com/mandelbro/graphiti-memory/actions/workflows/ci.yml/badge.svg)](https://github.com/mandelbro/graphiti-memory/actions/workflows/ci.yml)
+
 ## Features
 
 The Graphiti MCP server exposes the following key high-level functions of Graphiti:
