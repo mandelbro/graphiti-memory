@@ -129,7 +129,9 @@ class OllamaClient(BaseOpenAIClient):
         # Accept and ignore extra kwargs (e.g., reasoning) for compatibility with callers
         if "reasoning" in kwargs:
             # Some callers pass a reasoning dict not supported by Ollama
-            logger.debug("Ignoring unsupported 'reasoning' argument in structured completion")
+            logger.debug(
+                "Ignoring unsupported 'reasoning' argument in structured completion"
+            )
 
         response = await self._create_completion(
             model=model,

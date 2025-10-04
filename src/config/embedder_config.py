@@ -59,10 +59,12 @@ class GraphitiEmbedderConfig(BaseModel):
                 embed_config = {}
 
             ollama_base_url = config_loader.get_env_value(
-                "OLLAMA_BASE_URL", embed_config.get("base_url", "http://localhost:11434/v1")
+                "OLLAMA_BASE_URL",
+                embed_config.get("base_url", "http://localhost:11434/v1"),
             )
             ollama_embedding_model = config_loader.get_env_value(
-                "OLLAMA_EMBEDDING_MODEL", embed_config.get("model", DEFAULT_EMBEDDER_MODEL)
+                "OLLAMA_EMBEDDING_MODEL",
+                embed_config.get("model", DEFAULT_EMBEDDER_MODEL),
             )
             ollama_embedding_dim = config_loader.get_env_value(
                 "OLLAMA_EMBEDDING_DIM", embed_config.get("dimension", 768), int
@@ -78,7 +80,9 @@ class GraphitiEmbedderConfig(BaseModel):
             )
 
         # OpenAI or Azure OpenAI
-        azure_openai_endpoint = os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT", None) or os.environ.get("AZURE_OPENAI_ENDPOINT", None)
+        azure_openai_endpoint = os.environ.get(
+            "AZURE_OPENAI_EMBEDDING_ENDPOINT", None
+        ) or os.environ.get("AZURE_OPENAI_ENDPOINT", None)
 
         try:
             if azure_openai_endpoint is not None:
@@ -114,7 +118,10 @@ class GraphitiEmbedderConfig(BaseModel):
                 )
 
             api_key = (
-                None if azure_openai_use_managed_identity else os.environ.get("AZURE_OPENAI_EMBEDDING_API_KEY", None) or os.environ.get("OPENAI_API_KEY", None)
+                None
+                if azure_openai_use_managed_identity
+                else os.environ.get("AZURE_OPENAI_EMBEDDING_API_KEY", None)
+                or os.environ.get("OPENAI_API_KEY", None)
             )
 
             return cls(
