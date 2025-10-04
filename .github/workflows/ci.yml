@@ -23,8 +23,9 @@ jobs:
       - name: Install dev dependencies
         run: uv sync --extra dev
 
-      - name: Install just
-        run: uv add just
+      - name: Install just CLI
+        run: |
+          curl -fsSL https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
       - name: Run code quality checks
         run: just lint typecheck test
