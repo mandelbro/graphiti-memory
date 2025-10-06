@@ -126,6 +126,35 @@ class InitializationManager:
 
         return status_info
 
+    async def reset_for_testing(self) -> None:
+        """Reset the initialization state for testing purposes."""
+        async with self._lock:
+            # First, clean up any running background tasks
+            from . import episode_queues, queue_workers
+
+            # Stop all queue workers and clear the queues
+            for group_id in list(queue_workers.keys()):
+                queue_workers[group_id] = False
+                if group_id in episode_queues:
+                    # Clear any pending items in the queue
+                    while not episode_queues[group_id].empty():
+                        try:
+                            episode_queues[group_id].get_nowait()
+                            episode_queues[group_id].task_done()
+                        except asyncio.QueueEmpty:
+                            break
+
+            # Clear the global dictionaries
+            episode_queues.clear()
+            queue_workers.clear()
+
+            # Reset initialization state
+            self._state = InitializationState.NOT_STARTED
+            self._start_time = None
+            self._completion_time = None
+            self._error_message = None
+            logger.info("Initialization manager reset for testing")
+
     def get_not_ready_response(self) -> dict[str, Any]:
         """
         Get a standardized response for when the server is not ready.

@@ -34,23 +34,40 @@ async def process_episode_queue(group_id: str):
     queue_workers[group_id] = True
 
     try:
-        while True:
-            # Get the next episode processing function from the queue
-            # This will wait if the queue is empty
-            process_func = await episode_queues[group_id].get()
+        while queue_workers.get(group_id, False):
+            # Check if queue exists before accessing it
+            if group_id not in episode_queues:
+                logger.warning(f"Queue for group_id {group_id} no longer exists, stopping worker")
+                break
 
             try:
-                # Process the episode
-                await process_func()
-            except Exception as e:
-                logger.error(
-                    f"Error processing queued episode for group_id {group_id}: {str(e)}"
-                )
-            finally:
-                # Mark the task as done regardless of success/failure
-                episode_queues[group_id].task_done()
+                # Get the next episode processing function from the queue with timeout
+                # This allows for proper cancellation handling
+                try:
+                    process_func = await asyncio.wait_for(
+                        episode_queues[group_id].get(),
+                        timeout=1.0  # 1 second timeout to allow cancellation checks
+                    )
+                except asyncio.TimeoutError:
+                    # No work available, continue loop to check for cancellation
+                    continue
+
+                try:
+                    # Process the episode
+                    await process_func()
+                except Exception as e:
+                    logger.error(
+                        f"Error processing queued episode for group_id {group_id}: {str(e)}"
+                    )
+                finally:
+                    # Mark the task as done regardless of success/failure
+                    episode_queues[group_id].task_done()
+            except KeyError:
+                logger.warning(f"Queue for group_id {group_id} was removed during processing")
+                break
     except asyncio.CancelledError:
         logger.info(f"Episode queue worker for group_id {group_id} was cancelled")
+        raise  # Re-raise CancelledError to ensure proper task cancellation
     except Exception as e:
         logger.error(
             f"Unexpected error in queue worker for group_id {group_id}: {str(e)}"

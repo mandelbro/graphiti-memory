@@ -107,11 +107,6 @@ async def add_memory(
         not_ready_info = initialization_manager.get_not_ready_response()
         return ErrorResponse(error=not_ready_info["error"], details=not_ready_info)
 
-    # Check initialization state first
-    if not initialization_manager.is_ready:
-        not_ready_info = initialization_manager.get_not_ready_response()
-        return ErrorResponse(error=not_ready_info["error"], details=not_ready_info)
-
     if graphiti_client is None:
         return ErrorResponse(error="Graphiti client not initialized")
 
@@ -156,7 +151,10 @@ async def add_memory(
                 # Use all entity types if use_custom_entities is enabled, otherwise use empty dict
                 entity_types = ENTITY_TYPES if config.use_custom_entities else {}
 
-                await client.add_episode(
+                logger.info(f"About to call client.add_episode with name='{name}', group_id='{group_id_str}'")
+
+                # Add timeout to prevent hanging
+                add_episode_task = asyncio.create_task(client.add_episode(
                     name=name,
                     episode_body=episode_body,
                     source=source_type,
@@ -165,14 +163,27 @@ async def add_memory(
                     uuid=uuid,
                     reference_time=datetime.now(UTC),
                     entity_types=entity_types,
-                )
+                ))
+
+                try:
+                    await asyncio.wait_for(add_episode_task, timeout=30.0)  # 30 second timeout
+                except asyncio.TimeoutError:
+                    logger.error(f"client.add_episode() timed out after 30 seconds for episode '{name}'")
+                    add_episode_task.cancel()
+                    raise Exception(f"Episode processing timed out after 30 seconds")
                 logger.info(f"Episode '{name}' added successfully")
 
                 logger.info(f"Episode '{name}' processed successfully")
             except Exception as e:
+                import traceback
                 error_msg = str(e)
+                error_type = type(e).__name__
+                traceback_str = traceback.format_exc()
                 logger.error(
-                    f"Error processing episode '{name}' for group_id {group_id_str}: {error_msg}"
+                    f"Error processing episode '{name}' for group_id {group_id_str}:\n"
+                    f"  Error type: {error_type}\n"
+                    f"  Error message: {error_msg}\n"
+                    f"  Full traceback:\n{traceback_str}"
                 )
 
         # Initialize queue for this group_id if it doesn't exist

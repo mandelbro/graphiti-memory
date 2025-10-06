@@ -35,6 +35,7 @@ class GraphitiLLMConfig(BaseModel):
     small_model: str = SMALL_LLM_MODEL
     temperature: float = 0.0
     max_tokens: int = int(os.environ.get("LLM_MAX_TOKENS", "8192"))
+    base_url: str | None = None  # Generic base URL for any LLM provider
     azure_openai_endpoint: str | None = None
     azure_openai_deployment_name: str | None = None
     azure_openai_api_version: str | None = None

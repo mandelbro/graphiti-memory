@@ -88,7 +88,7 @@ class TestOllamaConnectionPooling:
         # Check timeouts
         timeout = call_kwargs["timeout"]
         assert timeout.connect == 5.0
-        assert timeout.read == 60.0
+        assert timeout.read == 300.0
         assert timeout.write == 5.0
         assert timeout.pool == 2.0
 

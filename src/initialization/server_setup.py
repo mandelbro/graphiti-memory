@@ -28,11 +28,63 @@ logger = logging.getLogger(__name__)
 
 async def initialize_server(
     mcp: FastMCP,
+    test_config: "GraphitiConfig | None" = None,
 ) -> tuple["MCPConfig", "GraphitiConfig", object]:
-    """Parse CLI arguments and initialize the Graphiti server configuration."""
+    """Parse CLI arguments and initialize the Graphiti server configuration.
+
+    Args:
+        mcp: FastMCP server instance
+        test_config: Optional GraphitiConfig for testing (bypasses CLI argument parsing)
+    """
     # Import config classes here to avoid circular imports
     from src.config import GraphitiConfig, MCPConfig
 
+    # If test_config is provided, use it directly and skip CLI parsing
+    if test_config is not None:
+        config = test_config
+
+        # Create a mock args object for MCP config creation
+        class MockArgs:
+            def __init__(self):
+                self.transport = "sse"
+                self.host = None
+                self.port = 8020
+
+        args = MockArgs()
+
+        # Log the configuration
+        logger.info(f"Using test configuration with group_id: {config.group_id}")
+
+        if config.use_custom_entities:
+            logger.info("Entity extraction enabled using predefined ENTITY_TYPES")
+        else:
+            logger.info("Entity extraction disabled (no custom entities will be used)")
+
+        # Log LLM configuration
+        if config.llm.use_ollama:
+            logger.info(f"Using Ollama LLM: {config.llm.ollama_llm_model}")
+            logger.info(f"Ollama base URL: {config.llm.ollama_base_url}")
+            logger.info(f"LLM temperature: {config.llm.temperature}")
+            logger.info(f"LLM max tokens: {config.llm.max_tokens}")
+        else:
+            logger.info(f"Using OpenAI/Azure OpenAI LLM: {config.llm.model}")
+            logger.info(f"LLM temperature: {config.llm.temperature}")
+            logger.info(f"LLM max tokens: {config.llm.max_tokens}")
+
+        # Log embedder configuration
+        if config.embedder.use_ollama:
+            logger.info(f"Using Ollama embedder: {config.embedder.ollama_embedding_model}")
+            logger.info(f"Embedding dimension: {config.embedder.ollama_embedding_dim}")
+        else:
+            logger.info(f"Using OpenAI/Azure OpenAI embedder: {config.embedder.model}")
+
+        # Initialize Graphiti
+        graphiti_client = await initialize_graphiti(config)
+
+        # Return MCP configuration and other objects
+        return MCPConfig.from_cli(args), config, graphiti_client
+
+    # Original CLI parsing logic for non-test contexts
     parser = argparse.ArgumentParser(
         description="Run the Graphiti MCP server with optional LLM client"
     )

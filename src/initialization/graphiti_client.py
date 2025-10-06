@@ -61,13 +61,13 @@ def _detect_ollama_configuration(config: "GraphitiConfig") -> bool:
                 logger.debug(f"Ollama detected via ollama_base_url pattern: {pattern}")
                 return True
 
-    # Also check standard ollama_base_url attribute for Ollama port 11434
-    if hasattr(config.llm, 'ollama_base_url') and config.llm.ollama_base_url:
-        base_url = config.llm.ollama_base_url.lower()
+    # Also check generic base_url attribute for Ollama port 11434
+    if hasattr(config.llm, 'base_url') and config.llm.base_url:
+        base_url = config.llm.base_url.lower()
 
         for pattern in ollama_patterns:
             if re.search(pattern, base_url):
-                logger.debug(f"Ollama detected via ollama_base_url pattern: {pattern}")
+                logger.debug(f"Ollama detected via base_url pattern: {pattern}")
                 return True
 
     logger.debug("No Ollama configuration detected")

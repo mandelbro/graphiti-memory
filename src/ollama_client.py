@@ -148,10 +148,31 @@ class OllamaClient(BaseOpenAIClient):
         # Attempt to parse and convert structured response using the response converter
         try:
             content = response.choices[0].message.content
-            # Check if content looks like JSON (objects or arrays)
-            if content and (content.strip().startswith("{") or content.strip().startswith("[")):
-                # Parse the JSON content
-                parsed_data = json.loads(content.strip())
+            if content:
+                # Strip XML tags if present and extract inner content
+                import re
+                stripped_content = content.strip()
+
+                # Look for various wrapping patterns and extract JSON
+                # 1. XML-wrapped JSON (e.g., <ENTITY>{...}</ENTITY>)
+                xml_match = re.search(r'<[^>]+>\s*([{[].*?[}\]])\s*</[^>]+>', stripped_content, re.DOTALL)
+                if xml_match:
+                    stripped_content = xml_match.group(1).strip()
+                # 2. Code block wrapped JSON (e.g., ```json {...} ```)
+                elif '```' in stripped_content:
+                    code_match = re.search(r'```(?:json)?\s*([{[].*?[}\]])\s*```', stripped_content, re.DOTALL)
+                    if code_match:
+                        stripped_content = code_match.group(1).strip()
+
+                # Check if content looks like JSON (objects or arrays)
+                if stripped_content.startswith("{") or stripped_content.startswith("["):
+                    # Try to parse as JSON first
+                    try:
+                        parsed_data = json.loads(stripped_content)
+                    except json.JSONDecodeError:
+                        # Fallback: try to parse Python-style dict with single quotes
+                        import ast
+                        parsed_data = ast.literal_eval(stripped_content)
 
                 # Use the response converter for comprehensive schema mapping
                 converted_data = self._response_converter.convert_structured_response(
