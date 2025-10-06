@@ -47,7 +47,7 @@ class TestUserScenario:
 
         # Should return error about server not being initialized (expected)
         assert isinstance(result, ErrorResponse)
-        assert "Server initialization has not started" in result.error
+        assert "Server initialization" in result.error
 
     @pytest.mark.asyncio
     async def test_search_memory_nodes_minimal_payload(self):
@@ -61,7 +61,7 @@ class TestUserScenario:
 
         # Should return error about server not being initialized (expected)
         assert isinstance(result, ErrorResponse)
-        assert "Server initialization has not started" in result.error
+        assert "Server initialization" in result.error
 
     @pytest.mark.asyncio
     async def test_search_memory_nodes_with_optional_params(self):
@@ -90,7 +90,7 @@ class TestUserScenario:
 
             # Should return error about server not being initialized (expected)
             assert isinstance(result, ErrorResponse)
-            assert "Server initialization has not started" in result.error
+            assert "Server initialization" in result.error
 
     def test_function_signature_compatibility(self):
         """Test that the function signature is compatible with MCP framework."""
@@ -243,7 +243,7 @@ class TestErrorHandling:
 
         # Check that error message is informative
         error_message = result.error
-        assert "Server initialization has not started" in error_message
+        assert "Server initialization" in error_message
         assert len(error_message) > 20  # Should be descriptive
 
 

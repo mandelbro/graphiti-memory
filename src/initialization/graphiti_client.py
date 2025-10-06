@@ -40,20 +40,20 @@ def _detect_ollama_configuration(config: "GraphitiConfig") -> bool:
         bool: True if Ollama configuration is detected, False otherwise
     """
     # Primary detection: explicit use_ollama flag
-    if hasattr(config.llm, 'use_ollama') and config.llm.use_ollama:
+    if hasattr(config.llm, "use_ollama") and config.llm.use_ollama:
         logger.debug("Ollama detected via explicit use_ollama flag")
         return True
 
     # Check for port 11434 in various URL formats
     ollama_patterns = [
-        r':11434',  # Direct port match
-        r'localhost:11434',  # Localhost with port
-        r'127\.0\.0\.1:11434',  # Loopback with port
-        r'0\.0\.0\.0:11434',  # All interfaces with port
+        r":11434",  # Direct port match
+        r"localhost:11434",  # Localhost with port
+        r"127\.0\.0\.1:11434",  # Loopback with port
+        r"0\.0\.0\.0:11434",  # All interfaces with port
     ]
 
     # Fallback detection: check ollama_base_url for Ollama port 11434
-    if hasattr(config.llm, 'ollama_base_url') and config.llm.ollama_base_url:
+    if hasattr(config.llm, "ollama_base_url") and config.llm.ollama_base_url:
         base_url = config.llm.ollama_base_url.lower()
 
         for pattern in ollama_patterns:
@@ -61,14 +61,8 @@ def _detect_ollama_configuration(config: "GraphitiConfig") -> bool:
                 logger.debug(f"Ollama detected via ollama_base_url pattern: {pattern}")
                 return True
 
-    # Also check standard base_url attribute for Ollama port 11434
-    if hasattr(config.llm, 'base_url') and config.llm.base_url:
-        base_url = config.llm.base_url.lower()
-
-        for pattern in ollama_patterns:
-            if re.search(pattern, base_url):
-                logger.debug(f"Ollama detected via base_url pattern: {pattern}")
-                return True
+    # Note: We don't check a generic base_url attribute as it's not part of GraphitiLLMConfig
+    # The ollama_base_url check above handles Ollama URL detection
 
     logger.debug("No Ollama configuration detected")
     return False
@@ -109,15 +103,17 @@ def _validate_ollama_configuration(config: "GraphitiConfig") -> None:
         )
 
     # Validate base URL format if provided
-    if hasattr(config.llm, 'ollama_base_url') and config.llm.ollama_base_url:
+    if hasattr(config.llm, "ollama_base_url") and config.llm.ollama_base_url:
         base_url = config.llm.ollama_base_url
-        if not (base_url.startswith('http://') or base_url.startswith('https://')):
+        if not (base_url.startswith("http://") or base_url.startswith("https://")):
             raise ValueError(
                 f"Invalid Ollama base URL format: {base_url}. "
                 "URL must start with 'http://' or 'https://'"
             )
 
-    logger.info(f"Validated Ollama LLM configuration: model={config.llm.ollama_llm_model}")
+    logger.info(
+        f"Validated Ollama LLM configuration: model={config.llm.ollama_llm_model}"
+    )
 
 
 def _create_enhanced_ollama_client(config: "GraphitiConfig"):
@@ -143,13 +139,15 @@ def _create_enhanced_ollama_client(config: "GraphitiConfig"):
             small_model=config.llm.ollama_llm_model,
             temperature=config.llm.temperature,
             max_tokens=config.llm.max_tokens,
-            base_url=getattr(config.llm, 'ollama_base_url', "http://localhost:11434/v1"),
+            base_url=getattr(
+                config.llm, "ollama_base_url", "http://localhost:11434/v1"
+            ),
         )
 
         # Create enhanced Ollama client with model parameters and response converter
         ollama_client = OllamaClient(
             config=llm_client_config,
-            model_parameters=getattr(config.llm, 'ollama_model_parameters', {})
+            model_parameters=getattr(config.llm, "ollama_model_parameters", {}),
         )
 
         logger.info(
@@ -238,7 +236,9 @@ async def create_graphiti_client(config: "GraphitiConfig") -> Graphiti:
         return graphiti_client
 
     except Exception as e:
-        logger.error(f"Failed to create Graphiti client with configuration override: {e}")
+        logger.error(
+            f"Failed to create Graphiti client with configuration override: {e}"
+        )
         raise
 
 

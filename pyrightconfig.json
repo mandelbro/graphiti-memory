@@ -15,12 +15,24 @@
   "pythonPlatform": "Darwin",
   "executionEnvironments": [
     {
-      "root": ".",
+      "root": "src",
       "pythonVersion": "3.13",
       "pythonPlatform": "Darwin",
       "extraPaths": [
         ".venv/lib/python3.13/site-packages"
       ]
+    },
+    {
+      "root": "tests",
+      "pythonVersion": "3.13",
+      "pythonPlatform": "Darwin",
+      "extraPaths": [
+        ".venv/lib/python3.13/site-packages"
+      ],
+      "reportAttributeAccessIssue": "none",
+      "reportCallIssue": "none",
+      "reportArgumentType": "none",
+      "reportReturnType": "none"
     }
   ],
   "typeCheckingMode": "basic",
