@@ -84,9 +84,25 @@ class ConfigLoader:
             logger.warning(f"Failed to load configuration from {full_path}: {e}")
             return {}
 
+    def load_unified_config(self) -> dict[str, Any]:
+        """
+        Load unified configuration from config.local.yml.
+
+        This is the preferred method for loading configuration. It supports
+        mixed provider configurations where LLM and embedder can use different
+        providers in a single file.
+
+        Returns:
+            Dictionary containing the unified configuration, or empty dict if not found
+        """
+        return self.load_yaml_config("config.local.yml")
+
     def load_provider_config(self, provider: str) -> dict[str, Any]:
         """
         Load provider-specific configuration with local override support.
+
+        This method is deprecated in favor of load_unified_config() but maintained
+        for backwards compatibility.
 
         Loads the base configuration from providers/{provider}.yml and merges it
         with local overrides from providers/{provider}.local.yml if it exists.
@@ -97,6 +113,15 @@ class ConfigLoader:
         Returns:
             Dictionary containing the merged provider configuration
         """
+        # First check for unified config - it takes precedence
+        unified_config = self.load_unified_config()
+        if unified_config:
+            logger.debug(
+                "Using unified config.local.yml (provider-specific config ignored)"
+            )
+            return unified_config
+
+        # Fall back to provider-specific config
         # Load base configuration
         base_config = self.load_yaml_config(f"providers/{provider}.yml")
 

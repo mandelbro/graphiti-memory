@@ -17,6 +17,7 @@ from pydantic import BaseModel
 
 from src.config_loader import config_loader
 from src.utils import create_azure_credential_token_provider
+from src.utils.ssl_utils import create_ssl_context_httpx_client, get_ssl_verify_setting
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ class GraphitiEmbedderConfig(BaseModel):
 
     model: str = DEFAULT_EMBEDDER_MODEL
     api_key: str | None = None
+    dimension: int | None = None  # Embedding dimension for OpenAI/Azure
+    base_url: str | None = None  # Base URL for OpenAI-compatible endpoints
     azure_openai_endpoint: str | None = None
     azure_openai_deployment_name: str | None = None
     azure_openai_api_version: str | None = None
@@ -44,20 +47,47 @@ class GraphitiEmbedderConfig(BaseModel):
     @classmethod
     def from_yaml_and_env(cls) -> "GraphitiEmbedderConfig":
         """Create embedder configuration from provider YAML and environment variables."""
-        # Decide provider based on USE_OLLAMA
-        use_ollama = (
-            config_loader.get_env_value("USE_OLLAMA", "true", str).lower() == "true"
+        # Check USE_OLLAMA environment variable first for provider detection
+        use_ollama_env = os.environ.get("USE_OLLAMA", "").lower() == "true"
+        
+        # Try to load unified config first
+        try:
+            yaml_config = config_loader.load_unified_config()
+            if not yaml_config:
+                # Fall back to provider-specific config
+                # Check for USE_OLLAMA first
+                if use_ollama_env:
+                    yaml_config = config_loader.load_provider_config("ollama")
+                else:
+                    # Check for Azure OpenAI (needs explicit env var)
+                    azure_openai_endpoint = os.environ.get(
+                        "AZURE_OPENAI_EMBEDDING_ENDPOINT", None
+                    ) or os.environ.get("AZURE_OPENAI_ENDPOINT", None)
+                    if azure_openai_endpoint is not None:
+                        yaml_config = config_loader.load_provider_config("azure_openai")
+                    else:
+                        # Default to openai config (works for OpenAI-compatible APIs)
+                        yaml_config = config_loader.load_provider_config("openai")
+
+            embed_config = yaml_config.get("embedder", {})
+        except Exception as e:
+            logger.warning(f"Failed to load embedder YAML configuration: {e}")
+            embed_config = {}
+
+        # Get base_url to detect provider type
+        base_url = embed_config.get("base_url", "")
+
+        # Detect if this is Ollama based on USE_OLLAMA env var or base_url pattern
+        # Ollama URLs contain localhost:11434 or have 'ollama' in the hostname
+        is_ollama = (
+            use_ollama_env
+            or "localhost:11434" in base_url
+            or "127.0.0.1:11434" in base_url
+            or ("ollama" in base_url.lower() and "localhost" in base_url.lower())
         )
 
-        if use_ollama:
-            # Load Ollama YAML (with local overrides) for embedder
-            try:
-                yaml_config = config_loader.load_provider_config("ollama")
-                embed_config = yaml_config.get("embedder", {})
-            except Exception as e:
-                logger.warning(f"Failed to load Ollama embedder YAML: {e}")
-                embed_config = {}
-
+        if is_ollama:
+            # Ollama configuration
             ollama_base_url = config_loader.get_env_value(
                 "OLLAMA_BASE_URL",
                 embed_config.get("base_url", "http://localhost:11434/v1"),
@@ -70,6 +100,10 @@ class GraphitiEmbedderConfig(BaseModel):
                 "OLLAMA_EMBEDDING_DIM", embed_config.get("dimension", 768), int
             )
 
+            logger.info(
+                f"Using Ollama embedder: {ollama_embedding_model} at {ollama_base_url}"
+            )
+
             return cls(
                 model=ollama_embedding_model,
                 api_key="abc",  # Ollama doesn't require a real API key
@@ -80,21 +114,13 @@ class GraphitiEmbedderConfig(BaseModel):
             )
 
         # OpenAI or Azure OpenAI
+        model = embed_config.get("model", "text-embedding-3-small")
+        dimension = embed_config.get("dimension")
+
         azure_openai_endpoint = os.environ.get(
             "AZURE_OPENAI_EMBEDDING_ENDPOINT", None
         ) or os.environ.get("AZURE_OPENAI_ENDPOINT", None)
 
-        try:
-            if azure_openai_endpoint is not None:
-                yaml_config = config_loader.load_provider_config("azure_openai")
-            else:
-                yaml_config = config_loader.load_provider_config("openai")
-            embed_config = yaml_config.get("embedder", {})
-        except Exception as e:
-            logger.warning(f"Failed to load OpenAI/Azure embedder YAML: {e}")
-            embed_config = {}
-
-        model = embed_config.get("model", "text-embedding-3-small")
         # Backward compatibility: allow EMBEDDER_MODEL_NAME to override model for
         # OpenAI and Azure OpenAI providers (does not affect Ollama)
         env_model_override = os.environ.get("EMBEDDER_MODEL_NAME")
@@ -129,9 +155,15 @@ class GraphitiEmbedderConfig(BaseModel):
                 or os.environ.get("OPENAI_API_KEY", None)
             )
 
+            logger.info(
+                f"Using Azure OpenAI embedder: {model} at {azure_openai_endpoint}"
+            )
+
             return cls(
                 model=model,
                 api_key=api_key,
+                dimension=dimension,
+                base_url=base_url,
                 azure_openai_endpoint=azure_openai_endpoint,
                 azure_openai_api_version=azure_openai_api_version,
                 azure_openai_deployment_name=azure_openai_deployment_name,
@@ -140,9 +172,16 @@ class GraphitiEmbedderConfig(BaseModel):
             )
 
         # OpenAI setup
+        if base_url:
+            logger.info(f"Using OpenAI-compatible embedder: {model} at {base_url}")
+        else:
+            logger.info(f"Using OpenAI embedder: {model}")
+
         return cls(
             model=model,
             api_key=os.environ.get("OPENAI_API_KEY"),
+            dimension=dimension,
+            base_url=base_url,
             use_ollama=False,
         )
 
@@ -185,23 +224,33 @@ class GraphitiEmbedderConfig(BaseModel):
             if self.azure_openai_use_managed_identity:
                 # Use managed identity for authentication
                 token_provider = create_azure_credential_token_provider()
+
+                # Create httpx client with SSL support
+                http_client = create_ssl_context_httpx_client()
+
                 return AzureOpenAIEmbedderClient(
                     azure_client=AsyncAzureOpenAI(
                         azure_endpoint=self.azure_openai_endpoint,
                         azure_deployment=self.azure_openai_deployment_name,
                         api_version=self.azure_openai_api_version,
                         azure_ad_token_provider=token_provider,
+                        http_client=http_client,
                     ),
                     model=self.model,
                 )
             elif self.api_key:
                 # Use API key for authentication
+
+                # Create httpx client with SSL support
+                http_client = create_ssl_context_httpx_client()
+
                 return AzureOpenAIEmbedderClient(
                     azure_client=AsyncAzureOpenAI(
                         azure_endpoint=self.azure_openai_endpoint,
                         azure_deployment=self.azure_openai_deployment_name,
                         api_version=self.azure_openai_api_version,
                         api_key=self.api_key,
+                        http_client=http_client,
                     ),
                     model=self.model,
                 )
@@ -213,8 +262,34 @@ class GraphitiEmbedderConfig(BaseModel):
             if not self.api_key:
                 return None
 
-            embedder_config = OpenAIEmbedderConfig(
-                api_key=self.api_key, embedding_model=self.model
-            )
+            # Use base_url and dimension from config (already loaded from YAML)
+            config_params = {
+                "api_key": self.api_key,
+                "embedding_model": self.model,
+                "base_url": self.base_url,
+            }
+            # Only include embedding_dim if it's specified
+            if self.dimension is not None:
+                config_params["embedding_dim"] = self.dimension
 
-            return OpenAIEmbedder(config=embedder_config)
+            embedder_config = OpenAIEmbedderConfig(**config_params)
+
+            embedder = OpenAIEmbedder(config=embedder_config)
+
+            # For OpenAI-compatible endpoints with custom SSL requirements,
+            # patch the underlying httpx client to use SSL certificates
+            ssl_verify = get_ssl_verify_setting()
+            if isinstance(ssl_verify, str) or ssl_verify is False:
+                # Custom certificate or SSL disabled - need to configure httpx client
+                import httpx
+
+                if hasattr(embedder, "client") and hasattr(embedder.client, "_client"):
+                    # Patch the internal httpx client with SSL configuration
+                    embedder.client._client = httpx.AsyncClient(
+                        verify=ssl_verify, timeout=30.0
+                    )
+                    logger.info(
+                        "Configured OpenAI embedder with custom SSL certificate"
+                    )
+
+            return embedder
