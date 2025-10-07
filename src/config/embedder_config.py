@@ -49,7 +49,7 @@ class GraphitiEmbedderConfig(BaseModel):
         """Create embedder configuration from provider YAML and environment variables."""
         # Check USE_OLLAMA environment variable first for provider detection
         use_ollama_env = os.environ.get("USE_OLLAMA", "").lower() == "true"
-        
+
         # Try to load unified config first
         try:
             yaml_config = config_loader.load_unified_config()

@@ -52,7 +52,7 @@ class GraphitiLLMConfig(BaseModel):
         # Try to load unified config first
         # Check USE_OLLAMA environment variable first for provider detection
         use_ollama_env = os.environ.get("USE_OLLAMA", "").lower() == "true"
-        
+
         try:
             yaml_config = config_loader.load_unified_config()
             if not yaml_config:
@@ -62,7 +62,9 @@ class GraphitiLLMConfig(BaseModel):
                     yaml_config = config_loader.load_provider_config("ollama")
                 else:
                     # Check for Azure OpenAI (needs explicit env var)
-                    azure_openai_endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", None)
+                    azure_openai_endpoint = os.environ.get(
+                        "AZURE_OPENAI_ENDPOINT", None
+                    )
                     if azure_openai_endpoint is not None:
                         yaml_config = config_loader.load_provider_config("azure_openai")
                     else:
