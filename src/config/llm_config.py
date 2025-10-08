@@ -79,14 +79,22 @@ class GraphitiLLMConfig(BaseModel):
         # Get base_url to detect provider type
         base_url = llm_config.get("base_url", "")
 
-        # Detect if this is Ollama based on USE_OLLAMA env var or base_url pattern
-        # Ollama URLs contain localhost:11434 or have 'ollama' in the hostname
-        is_ollama = (
-            use_ollama_env
-            or "localhost:11434" in base_url
-            or "127.0.0.1:11434" in base_url
-            or ("ollama" in base_url.lower() and "localhost" in base_url.lower())
-        )
+        # Check explicit use_ollama setting in YAML (has highest priority)
+        yaml_use_ollama = llm_config.get("use_ollama")
+
+        # Detect if this is Ollama based on explicit setting, env var, or base_url pattern
+        # Priority: 1) Explicit YAML use_ollama, 2) USE_OLLAMA env var, 3) base_url pattern
+        if yaml_use_ollama is not None:
+            # Explicit YAML setting takes precedence
+            is_ollama = yaml_use_ollama
+        else:
+            # Fall back to env var and URL pattern detection
+            is_ollama = (
+                use_ollama_env
+                or "localhost:11434" in base_url
+                or "127.0.0.1:11434" in base_url
+                or ("ollama" in base_url.lower() and "localhost" in base_url.lower())
+            )
 
         if is_ollama:
             # Ollama configuration

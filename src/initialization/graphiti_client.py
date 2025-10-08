@@ -29,7 +29,7 @@ def _detect_ollama_configuration(config: "GraphitiConfig") -> bool:
     Detect if the configuration specifies Ollama usage.
 
     Uses multiple detection methods for robust identification:
-    1. Explicit use_ollama flag (primary method)
+    1. Explicit use_ollama flag (primary method - takes precedence over all others)
     2. Base URL contains Ollama default port 11434 (fallback method)
     3. Various URL format handling (localhost, 127.0.0.1, etc.)
 
@@ -40,11 +40,17 @@ def _detect_ollama_configuration(config: "GraphitiConfig") -> bool:
         bool: True if Ollama configuration is detected, False otherwise
     """
     # Primary detection: explicit use_ollama flag
-    if hasattr(config.llm, "use_ollama") and config.llm.use_ollama:
-        logger.debug("Ollama detected via explicit use_ollama flag")
+    # If explicitly set to True, use Ollama
+    if hasattr(config.llm, "use_ollama") and config.llm.use_ollama is True:
+        logger.debug("Ollama detected via explicit use_ollama=True flag")
         return True
 
-    # Check for port 11434 in various URL formats
+    # If explicitly set to False, do NOT use Ollama (overrides all other detection)
+    if hasattr(config.llm, "use_ollama") and config.llm.use_ollama is False:
+        logger.debug("Ollama explicitly disabled via use_ollama=False flag")
+        return False
+
+    # Check for port 11434 in various URL formats (only if use_ollama not explicitly set)
     ollama_patterns = [
         r":11434",  # Direct port match
         r"localhost:11434",  # Localhost with port
