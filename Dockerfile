@@ -31,9 +31,24 @@ RUN groupadd -r app && useradd -r -d /app -g app app
 # Copy project files for dependency installation (better caching)
 COPY pyproject.toml uv.lock README.md ./
 
-# Install dependencies first (better layer caching)
+# Install custom CA certificate into system trust store if provided
+# This persists the certificate in the image for both build and runtime
+RUN --mount=type=secret,id=ssl_cert,target=/tmp/ca-cert.pem,required=false \
+    sh -c ' \
+        if [ -f /tmp/ca-cert.pem ] && [ -s /tmp/ca-cert.pem ]; then \
+            echo "Installing custom CA certificate into system trust store"; \
+            cp /tmp/ca-cert.pem /usr/local/share/ca-certificates/custom-ca.crt; \
+            update-ca-certificates; \
+            echo "Certificate installed and will persist in container"; \
+        else \
+            echo "No custom CA certificate provided - using system defaults"; \
+        fi \
+    '
+
+# Install dependencies including dev dependencies (after certificate is installed, if provided)
+# We install dev dependencies here so they're available at runtime without re-downloading
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen
 
 # Copy application code
 COPY src/ ./src/

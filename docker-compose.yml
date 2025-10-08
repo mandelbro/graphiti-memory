@@ -38,6 +38,9 @@ services:
     build:
       context: .
       dockerfile: ${DOCKERFILE:-Dockerfile}
+      secrets:
+        # Pass SSL certificate to build process if SSL_CERT_FILE is set
+        - ssl_cert
     develop:
       watch:
         - path: ./src
@@ -58,29 +61,48 @@ services:
       neo4j:
         condition: service_healthy
     environment:
+      # Neo4j Configuration
       - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
       - NEO4J_USER=${NEO4J_USER:-neo4j}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD:-demodemo}
-      - USE_OLLAMA=${USE_OLLAMA:-true}
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434/v1
-      - OLLAMA_LLM_MODEL=deepseek-r1:7b
-      - OLLAMA_EMBEDDING_MODEL=nomic-embed-text
-      - OLLAMA_EMBEDDING_DIM=768
-      - LLM_MAX_TOKENS=32768
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-abc}
+      # API Key (passed from .env, works for both OpenAI and Bedrock)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Path configuration
       - PATH=/root/.local/bin:${PATH}
+      - PYTHONPATH=/app
+      # Server configuration
       - SEMAPHORE_LIMIT=${SEMAPHORE_LIMIT:-10}
       - MCP_SERVER_PORT=${MCP_SERVER_PORT:-8020}
       - MCP_INTERNAL_PORT=${MCP_INTERNAL_PORT:-$((MCP_SERVER_PORT + 1))}
+      # OAuth Configuration
       - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-graphiti-mcp}
       - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-graphiti-secret-key-change-this-in-production}
       - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8020}
       - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-graphiti-mcp}
+      # Analytics Configuration (optional - disable PostHog telemetry)
+      - POSTHOG_DISABLED=${POSTHOG_DISABLED:-0}
+      # SSL Certificate paths for Docker container (optional)
+      # If custom CA cert was installed during build, point to system trust store
+      # Otherwise, these will be empty and system defaults will be used
+      - SSL_CERT_FILE=${SSL_CERT_FILE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - REQUESTS_CA_BUNDLE=${REQUESTS_CA_BUNDLE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    # SSL certificate volume mount (enabled for custom CA certificates)
+    volumes:
+      - ${SSL_CERT_DIR}:/app/.certs:ro
     ports:
       - "${MCP_SERVER_PORT:-8020}:8020" # Expose the OAuth wrapper
-    command: ["sh", "-c", "uv run python src/graphiti_mcp_server.py --transport sse --port $MCP_INTERNAL_PORT & uv run python src/oauth_wrapper.py"]
+    command: ["sh", "-c", ".venv/bin/python src/graphiti_mcp_server.py --transport sse --port $MCP_INTERNAL_PORT & .venv/bin/python src/oauth_wrapper.py"]
 
 volumes:
   neo4j_data:
   neo4j_logs:
   # ollama_data:  # Uncomment if using Ollama service
+
+secrets:
+  # SSL certificate for build process
+  # Set SSL_CERT_BUILD_PATH in .env to the full path of your certificate file
+  # Example: SSL_CERT_BUILD_PATH=/Users/yourname/.certs/ca-bundle.pem
+  # Defaults to /dev/null so build still works without SSL certs
+  ssl_cert:
+    file: ${SSL_CERT_BUILD_PATH:-/dev/null}
