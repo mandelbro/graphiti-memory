@@ -110,7 +110,7 @@ For backward compatibility, provider-specific configurations are still supported
 ### Provider Configuration Files
 
 - `providers/ollama.yml` - Base Ollama configuration
-- `providers/openai.yml` - Base OpenAI configuration  
+- `providers/openai.yml` - Base OpenAI configuration
 - `providers/azure_openai.yml` - Base Azure OpenAI configuration
 
 ### Local Override Files
