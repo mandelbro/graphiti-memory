@@ -11,6 +11,15 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+    set -a  # Automatically export all variables
+    source .env
+    set +a
+    echo -e "${GREEN}✓${NC} Loaded environment variables from .env file"
+    echo ""
+fi
+
 print_header() {
     echo ""
     echo -e "${GREEN}========================================${NC}"
@@ -155,7 +164,10 @@ fi
 # Test 4: Test SSL Connection with curl
 print_header "Test 4: SSL Connection Test (curl)"
 
-GATEWAY_HOST="eng-ai-model-gateway.sfproxy.devx-preprod.aws-esvc1-useast2.aws.sfdc.cl"
+# Extract gateway hostname from the LLM base URL
+GATEWAY_HOST="${llm_base_url#https://}"
+GATEWAY_HOST="${GATEWAY_HOST#http://}"
+GATEWAY_HOST="${GATEWAY_HOST%%/*}"
 
 print_info "Testing SSL connection to: $GATEWAY_HOST"
 echo ""
@@ -279,14 +291,19 @@ print_header "Test 7: Python SSL Verification"
 print_info "Testing Python SSL certificate handling..."
 echo ""
 
+# Export variables for Python script
+export LLM_BASE_URL="$llm_base_url"
+
 python3 << 'EOF'
 import os
 import sys
 import ssl
 import httpx
 
-cert_path = os.path.expanduser("$SSL_CERT_FILE")
-gateway_host = "eng-ai-model-gateway.sfproxy.devx-preprod.aws-esvc1-useast2.aws.sfdc.cl"
+cert_path = os.path.expanduser(os.getenv("SSL_CERT_FILE", ""))
+# Extract gateway host from LLM_BASE_URL environment variable
+base_url = os.getenv("LLM_BASE_URL", "https://api.openai.com")
+gateway_host = base_url.replace("https://", "").replace("http://", "").split("/")[0]
 
 print(f"Certificate path: {cert_path}")
 print(f"File exists: {os.path.exists(cert_path)}")

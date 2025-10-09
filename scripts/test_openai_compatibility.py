@@ -192,9 +192,8 @@ async def test_native_gateway_endpoint(config: dict, api_key: str):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
-        "x-client-feature-id": "GraphitiTest",
-        "x-sfdc-app-context": "GraphitiMemory",
-        "x-sfdc-core-tenant-id": "test-tenant",
+        # Add custom headers here if your API gateway requires them
+        # "x-custom-header": "value",
     }
 
     try:
