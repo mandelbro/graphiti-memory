@@ -80,7 +80,8 @@ services:
       - OAUTH_ISSUER=${OAUTH_ISSUER:-http://localhost:8020}
       - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-graphiti-mcp}
       # Analytics Configuration (optional - disable PostHog telemetry)
-      - POSTHOG_DISABLED=${POSTHOG_DISABLED:-0}
+      # Note: graphiti-core expects GRAPHITI_TELEMETRY_ENABLED (false to disable)
+      - GRAPHITI_TELEMETRY_ENABLED=${GRAPHITI_TELEMETRY_ENABLED:-true}
       # SSL Certificate paths for Docker container (optional)
       # If custom CA cert was installed during build, point to system trust store
       # Otherwise, these will be empty and system defaults will be used
