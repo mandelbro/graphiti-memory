@@ -56,14 +56,14 @@ uv run src/graphiti_mcp_server.py --transport stdio
 
 ## Configuration Examples
 
-### Example 1: Bedrock LLM + Local Ollama Embeddings (Recommended)
+### Example 1: Enterprise Gateway LLM + Local Ollama Embeddings (Recommended)
 
-This is the optimal configuration for most use cases - enterprise LLM with fast local embeddings.
+This is the optimal configuration for most use cases - enterprise LLM gateway with fast local embeddings.
 
 ```yaml
 llm:
-  model: "claude-sonnet-4-20250514"
-  base_url: "https://eng-ai-model-gateway.sfproxy.devx-preprod.aws-esvc1-useast2.aws.sfdc.cl"
+  model: "gpt-4o"
+  base_url: "https://your-enterprise-gateway.example.com"
   temperature: 0.1
   max_tokens: 25000
 
@@ -82,8 +82,9 @@ embedder:
 ```
 
 **Required:**
-- `OPENAI_API_KEY` for Bedrock gateway
+- `OPENAI_API_KEY` for your enterprise gateway
 - Ollama running locally with `nomic-embed-text` model
+- Optional: SSL certificates if your gateway requires them
 
 **Benefits:**
 - Enterprise-grade LLM for complex reasoning
