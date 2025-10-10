@@ -74,7 +74,7 @@ else
 fi
 
 if [ -z "${NEO4J_PASSWORD:-}" ]; then
-    export NEO4J_PASSWORD="password"
+    export NEO4J_PASSWORD="demodemo"
     echo -e "${BLUE}ℹ${NC} NEO4J_PASSWORD set to default: ********"
 else
     export NEO4J_PASSWORD

@@ -15,7 +15,7 @@ class Neo4jConfig(BaseModel):
 
     uri: str = "bolt://localhost:7687"
     user: str = "neo4j"
-    password: str = "password"
+    password: str = "demodemo"  # Must match docker-compose.yml default
 
     @classmethod
     def from_env(cls) -> "Neo4jConfig":
@@ -23,5 +23,5 @@ class Neo4jConfig(BaseModel):
         return cls(
             uri=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
             user=os.environ.get("NEO4J_USER", "neo4j"),
-            password=os.environ.get("NEO4J_PASSWORD", "password"),
+            password=os.environ.get("NEO4J_PASSWORD", "demodemo"),  # Must match docker-compose.yml default
         )
