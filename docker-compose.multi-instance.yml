@@ -1,0 +1,223 @@
+# Multi-Instance Docker Compose Configuration
+# This configuration allows you to run multiple instances of the Graphiti MCP server
+# Each instance runs on a different port and has its own group_id
+# You can access each instance at:
+#  * http://localhost:8020/sse?group_id=claude_desktop
+#  * http://localhost:8022/sse?group_id=cursor_ide
+#  * http://localhost:8024/sse?group_id=project_xyz
+#
+# Copy this file locally and modify the environment variables to your liking.
+#
+# Example:
+# $ cp docker-compose.multi-instance.yml docker-compose.local.yml
+# $ docker compose -f docker-compose.local.yml up
+# # Or use the justfile command
+# $ just rebuild-local
+services:
+  neo4j:
+    image: neo4j:5.26.0
+    ports:
+      - "7474:7474" # HTTP
+      - "7687:7687" # Bolt
+    environment:
+      - NEO4J_AUTH=${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-demodemo}
+      - NEO4J_server_memory_heap_initial__size=512m
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=512m
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD", "wget", "-O", "/dev/null", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ============================================================================
+  # Instance 1: Claude Desktop / Default Workspace
+  # Accessible at: http://localhost:8020/sse?group_id=claude_desktop (optional query param)
+  # ============================================================================
+  graphiti-mcp-claude:
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE:-Dockerfile}
+      secrets:
+        - ssl_cert
+    develop:
+      watch:
+        - path: ./src
+          action: sync
+          target: /app/src
+        - path: ./pyproject.toml
+          action: sync
+          target: /app/pyproject.toml
+        - path: ./uv.lock
+          action: sync
+          target: /app/uv.lock
+        - path: ./Dockerfile
+          action: rebuild
+    env_file:
+      - path: .env
+        required: true
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      # Neo4j Configuration (shared)
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-demodemo}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Path configuration
+      - PATH=/root/.local/bin:${PATH}
+      - PYTHONPATH=/app
+      # Server configuration - INSTANCE SPECIFIC
+      - SEMAPHORE_LIMIT=${SEMAPHORE_LIMIT:-10}
+      - MCP_SERVER_PORT=8020          # OAuth wrapper port for Claude
+      - MCP_INTERNAL_PORT=8021         # Internal MCP server port for Claude
+      - GROUP_ID=claude_desktop        # Default group_id for this instance
+      # OAuth Configuration
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-graphiti-mcp-claude}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-graphiti-secret-key-change-this-in-production}
+      - OAUTH_ISSUER=http://localhost:8020
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-graphiti-mcp}
+      # Analytics Configuration
+      - GRAPHITI_TELEMETRY_ENABLED=${GRAPHITI_TELEMETRY_ENABLED:-true}
+      # SSL Certificate paths
+      - SSL_CERT_FILE=${SSL_CERT_FILE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - REQUESTS_CA_BUNDLE=${REQUESTS_CA_BUNDLE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ${SSL_CERT_DIR:-./.certs}:/app/.certs:ro
+    ports:
+      - "8020:8020" # OAuth wrapper exposed port
+    command: ["sh", "-c", ".venv/bin/python src/graphiti_mcp_server.py --transport sse --port 8021 --group-id claude_desktop & .venv/bin/python src/oauth_wrapper.py"]
+
+  # ============================================================================
+  # Instance 2: Cursor IDE
+  # Accessible at: http://localhost:8022/sse?group_id=cursor_ide (optional query param)
+  # ============================================================================
+  graphiti-mcp-cursor:
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE:-Dockerfile}
+      secrets:
+        - ssl_cert
+    develop:
+      watch:
+        - path: ./src
+          action: sync
+          target: /app/src
+        - path: ./pyproject.toml
+          action: sync
+          target: /app/pyproject.toml
+        - path: ./uv.lock
+          action: sync
+          target: /app/uv.lock
+        - path: ./Dockerfile
+          action: rebuild
+    env_file:
+      - path: .env
+        required: true
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      # Neo4j Configuration (shared)
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-demodemo}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Path configuration
+      - PATH=/root/.local/bin:${PATH}
+      - PYTHONPATH=/app
+      # Server configuration - INSTANCE SPECIFIC
+      - SEMAPHORE_LIMIT=${SEMAPHORE_LIMIT:-10}
+      - MCP_SERVER_PORT=8022          # OAuth wrapper port for Cursor
+      - MCP_INTERNAL_PORT=8023         # Internal MCP server port for Cursor
+      - GROUP_ID=cursor_ide            # Default group_id for this instance
+      # OAuth Configuration
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-graphiti-mcp-cursor}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-graphiti-secret-key-change-this-in-production}
+      - OAUTH_ISSUER=http://localhost:8022
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-graphiti-mcp}
+      # Analytics Configuration
+      - GRAPHITI_TELEMETRY_ENABLED=${GRAPHITI_TELEMETRY_ENABLED:-true}
+      # SSL Certificate paths
+      - SSL_CERT_FILE=${SSL_CERT_FILE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - REQUESTS_CA_BUNDLE=${REQUESTS_CA_BUNDLE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ${SSL_CERT_DIR:-./.certs}:/app/.certs:ro
+    ports:
+      - "8022:8022" # OAuth wrapper exposed port
+    command: ["sh", "-c", ".venv/bin/python src/graphiti_mcp_server.py --transport sse --port 8023 --group-id cursor_ide & .venv/bin/python src/oauth_wrapper.py"]
+
+  # ============================================================================
+  # Instance 3: Project-Specific (Optional)
+  # Accessible at: http://localhost:8024/sse?group_id=project_xyz (optional query param)
+  # ============================================================================
+  graphiti-mcp-project:
+    build:
+      context: .
+      dockerfile: ${DOCKERFILE:-Dockerfile}
+      secrets:
+        - ssl_cert
+    develop:
+      watch:
+        - path: ./src
+          action: sync
+          target: /app/src
+        - path: ./pyproject.toml
+          action: sync
+          target: /app/pyproject.toml
+        - path: ./uv.lock
+          action: sync
+          target: /app/uv.lock
+        - path: ./Dockerfile
+          action: rebuild
+    env_file:
+      - path: .env
+        required: true
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    environment:
+      # Neo4j Configuration (shared)
+      - NEO4J_URI=${NEO4J_URI:-bolt://neo4j:7687}
+      - NEO4J_USER=${NEO4J_USER:-neo4j}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD:-demodemo}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      # Path configuration
+      - PATH=/root/.local/bin:${PATH}
+      - PYTHONPATH=/app
+      # Server configuration - INSTANCE SPECIFIC
+      - SEMAPHORE_LIMIT=${SEMAPHORE_LIMIT:-10}
+      - MCP_SERVER_PORT=8024          # OAuth wrapper port for Project
+      - MCP_INTERNAL_PORT=8025         # Internal MCP server port for Project
+      - GROUP_ID=project_xyz           # Default group_id for this instance
+      # OAuth Configuration
+      - OAUTH_CLIENT_ID=${OAUTH_CLIENT_ID:-graphiti-mcp-project}
+      - OAUTH_CLIENT_SECRET=${OAUTH_CLIENT_SECRET:-graphiti-secret-key-change-this-in-production}
+      - OAUTH_ISSUER=http://localhost:8024
+      - OAUTH_AUDIENCE=${OAUTH_AUDIENCE:-graphiti-mcp}
+      # Analytics Configuration
+      - GRAPHITI_TELEMETRY_ENABLED=${GRAPHITI_TELEMETRY_ENABLED:-true}
+      # SSL Certificate paths
+      - SSL_CERT_FILE=${SSL_CERT_FILE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - REQUESTS_CA_BUNDLE=${REQUESTS_CA_BUNDLE_DOCKER:-/etc/ssl/certs/ca-certificates.crt}
+      - CURL_CA_BUNDLE=/etc/ssl/certs/ca-certificates.crt
+    volumes:
+      - ${SSL_CERT_DIR:-./.certs}:/app/.certs:ro
+    ports:
+      - "8024:8024" # OAuth wrapper exposed port
+    command: ["sh", "-c", ".venv/bin/python src/graphiti_mcp_server.py --transport sse --port 8025 --group-id project_xyz & .venv/bin/python src/oauth_wrapper.py"]
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+
+secrets:
+  ssl_cert:
+    file: ${SSL_CERT_BUILD_PATH:-/dev/null}
