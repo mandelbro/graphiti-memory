@@ -26,7 +26,7 @@ def setup_environment():
     os.environ["OLLAMA_EMBEDDING_MODEL"] = "nomic-embed-text"
     os.environ["NEO4J_URI"] = "bolt://localhost:7687"
     os.environ["NEO4J_USER"] = "neo4j"
-    os.environ["NEO4J_PASSWORD"] = "password"
+    os.environ["NEO4J_PASSWORD"] = "demodemo"  # Must match docker-compose.yml default
 
 
 class TestUserScenario:

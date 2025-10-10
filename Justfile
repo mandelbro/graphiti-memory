@@ -81,6 +81,12 @@ clean:
 @rebuild:
 	{{DC}} down && {{DC}} build --no-cache && {{DC}} up -d && {{DC}} logs -f
 
+@rebuild-local:
+	{{DC}} -f docker-compose.local.yml down && \
+	{{DC}} -f docker-compose.local.yml build --no-cache && \
+	{{DC}} -f docker-compose.local.yml up -d && \
+	{{DC}} -f docker-compose.local.yml logs -f
+
 @restart:
 	{{DC}} down && {{DC}} up -d && {{DC}} logs -f
 

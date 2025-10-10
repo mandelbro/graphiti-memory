@@ -62,7 +62,7 @@ class TestGraphitiPipelineIntegration:
             neo4j=Neo4jConfig(
                 uri=os.getenv("TEST_NEO4J_URI", "bolt://localhost:7687"),
                 user=os.getenv("TEST_NEO4J_USER", "neo4j"),
-                password=os.getenv("TEST_NEO4J_PASSWORD", "password"),
+                password=os.getenv("TEST_NEO4J_PASSWORD", "demodemo"),  # Must match docker-compose.yml default
             ),
             llm=GraphitiLLMConfig(
                 model="gpt-oss:latest",

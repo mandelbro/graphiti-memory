@@ -239,6 +239,27 @@ To use OpenAI instead of Ollama in Docker:
    uv run src/graphiti_mcp_server.py --transport sse
    ```
 
+## Testing Your Configuration
+
+Before starting the MCP server, validate that your models work with their configured parameters:
+
+```bash
+# Test model compatibility (recommended before first run)
+scripts/test_model_compatibility.sh
+
+# For detailed debugging of connections and SSL
+scripts/debug_bedrock_connection.sh
+```
+
+The compatibility test will catch common issues like:
+- Temperature constraints (e.g., some models require temperature >= 1.0)
+- Model availability on configured endpoints
+- Embedding dimension mismatches
+- Authentication failures
+- SSL certificate issues
+
+📖 **See [TESTING_QUICKSTART.md](TESTING_QUICKSTART.md) for quick reference or [docs/MODEL_COMPATIBILITY_TESTING.md](docs/MODEL_COMPATIBILITY_TESTING.md) for comprehensive testing guide.**
+
 ## Configuration
 
 The server supports multiple configuration methods with the following precedence (highest to lowest):
@@ -843,6 +864,8 @@ Or add it to your `.env` file:
 ```
 GRAPHITI_TELEMETRY_ENABLED=false
 ```
+
+> **Note**: If you see SSL certificate errors related to PostHog (us.i.posthog.com) in your logs, ensure you're using `GRAPHITI_TELEMETRY_ENABLED=false` (not the deprecated `POSTHOG_DISABLED=1`).
 
 For complete details about what's collected and why, see the [Telemetry section in the main Graphiti README](../README.md#telemetry).
 
